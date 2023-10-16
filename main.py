@@ -5,6 +5,9 @@ from discord.ext import commands
 from datetime import datetime
 from bs4 import BeautifulSoup
 import aiohttp
+from dotenv import load_dotenv
+import os
+
 
 date_to_company = {
     datetime(2023, 9, 13): "Frontier Developments",
@@ -118,5 +121,8 @@ async def earnings(ctx, *args):
             await ctx.send('No earnings in the 7 days.')
 
 # Run the bot
-bot.run('MTE2MzIwNTg2NjY3ODM5MDg2NA.GnT91y.ZbaqvkQpI4vpHGic8zKBV15imzPSFVHgizl0F0')
+load_dotenv()
+bot_token = os.getenv('BOT_TOKEN')
+
+bot.run(bot_token)
 

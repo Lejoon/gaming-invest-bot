@@ -44,7 +44,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents = intents)
 
 async def fetch_steam_top_sellers():
-    url = "https://store.steampowered.com/search/?filter=topsellers"
+    url = "https://store.steampowered.com/search/?filter=globaltopsellers"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             html = await response.text()

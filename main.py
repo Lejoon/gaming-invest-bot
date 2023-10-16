@@ -64,7 +64,7 @@ async def fetch_mfn_updates():
                 author = soup.find("a", class_="title-link author-link author-preview").text
                 author_url = soup.find("a", class_="title-link author-link author-preview")['href']
                 title = soup.find("a", class_="title-link item-link").text
-                title_url = "http://www.mfn.se/"+soup.find("a", class_="title-link item-link")['href']
+                title_url = "http://www.mfn.se"+soup.find("a", class_="title-link item-link")['href']
 
                 # Create an embedded message
                 embed = discord.Embed(title=author, url=title_url, description=title, color=0x00ff00)

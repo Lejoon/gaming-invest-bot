@@ -5,40 +5,24 @@ from discord.ext import commands
 from datetime import datetime
 from bs4 import BeautifulSoup
 import aiohttp
-from dotenv import load_dotenv
 import os
 import websockets
 import time
 import asyncio
+import json
+import aiomysql
+import sqlite3
 
-date_to_company = {
-    datetime(2023, 9, 13): "Frontier Developments",
-    datetime(2023, 9, 16): "Gamestop",
-    datetime(2023, 9, 19): "Team17",
-    datetime(2023, 9, 21): "People Can Fly",
-    datetime(2023, 9, 25): "Devolver Digital",
-    datetime(2023, 9, 26): "tinyBuild",
-    datetime(2023, 9, 27): "Digital Bros/505 Games",
-    datetime(2023, 9, 29): "CI Games",
-    datetime(2023, 10, 16): "DON'T NOD",
-    datetime(2023, 10, 18): "Netflix",
-    datetime(2023, 10, 19): "Focus Entertainment",
-    datetime(2023, 10, 24): "Microsoft",
-    datetime(2023, 10, 26): ["Capcom", "Ubisoft", "Paradox Interactive"],
-    datetime(2023, 10, 27): "Activision Blizzard*",
-    datetime(2023, 10, 30): ["NACON", "KOEI Tecmo"],
-    datetime(2023, 10, 31): "Remedy",
-    datetime(2023, 11, 1): "EA",
-    datetime(2023, 11, 2): ["Kadokawa", "Paramount", "Konami"],
-    datetime(2023, 11, 7): ["Bandai Namco", "Nintendo"],
-    datetime(2023, 11, 8): ["Take-Two*", "SEGA Sammy", "Disney", "Roblox", "Warner Discovery"],
-    datetime(2023, 11, 9): ["NEXON", "Square Enix*", "Krafton*", "Sony"],
-    datetime(2023, 11, 14): "Bloober Team*",
-    datetime(2023, 11, 15): ["Tencent", "NetEase*", "Maximum Entertainment", "Thunderful Group"],
-    datetime(2023, 11, 16): ["Embracer Group", "Starbreeze"],
-    datetime(2023, 11, 23): "11bit Studios",
-    datetime(2023, 11, 28): "CD Projekt Group",
-}
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Create an instance of the Database class
+from database import Database
+db = Database('steam_top_games.db')
+
+# Import earning dates
+from earning_dates import date_to_company
 
 # Initialize the bot
 intents = discord.Intents.default()
@@ -47,85 +31,91 @@ bot = commands.Bot(command_prefix='!', intents = intents)
 
 # ------ WebSocket ------
 
-async def fetch_mfn_updates():
-    websocket_url = 'wss://www.mfn.se/all/s?filter=(and(or(.properties.lang%3D%22sv%22))(or(a.list_id%3D35207)(a.list_id%3D35208)(a.list_id%3D35209)(a.list_id%3D919325)(a.list_id%3D35198)(a.list_id%3D29934)(a.list_id%3D5700306)(a.list_id%3D4680265)))'
-    try:
-        async with websockets.connect(websocket_url) as ws:
-            print("WebSocket connection established.")
-            while True:
-                message = await ws.recv()
-
-                # Parse the HTML content
-                soup = BeautifulSoup(message, 'html.parser')
-                
-                # Extract the required information
-                date = soup.find("span", class_="compressed-date").text
-                time = soup.find("span", class_="compressed-time").text
-                author = soup.find("a", class_="title-link author-link author-preview").text
-                author_url = soup.find("a", class_="title-link author-link author-preview")['href']
-                title = soup.find("a", class_="title-link item-link").text
-                title_url = "http://www.mfn.se"+soup.find("a", class_="title-link item-link")['href']
-
-                # Create an embedded message
-                embed = discord.Embed(title=author, url=title_url, description=title, color=0x00ff00)
-                #embed = discord.Embed(title=title, url=title_url, description=f"Author: [{author}]({author_url})\nDate: {date}\nTime: {time}", color=0x00ff00)
-
-                # Fetch a Discord channel by its ID (replace 'your_channel_id_here' with the actual channel ID)
-                channel = bot.get_channel(1163373835886805013)
-                if channel:
-                    await channel.send(embed=embed)
-                    
-    except Exception as e:
-        print(f"WebSocket Error: {e}")
-        return  # Connection closed or other error, return to allow reconnection attempt
-
-async def websocket_background_task():
-    attempt_count = 0
-    while True:
-        try:
-            await fetch_mfn_updates()
-            print("WebSocket connection closed.")
-            attempt_count = 0  # Reset the attempt count if successfully connected
-        except Exception as e:
-            print(f"WebSocket Error: {e}")
-
-        # Calculate the wait time using exponential backoff
-        attempt_count += 1
-        wait_time = min(2 ** attempt_count, 60)  # Exponential backoff, capped at 60 seconds
-        print(f"Reconnecting in {wait_time} seconds...")
-        
-        await asyncio.sleep(wait_time)  # Wait before retrying
+from mfn import websocket_background_task
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
     bot.loop.create_task(websocket_background_task())  # Start the background task
 
+# Create tables
+loop = asyncio.get_event_loop()
+loop.run_until_complete(db.create_tables())
 
-#------ Commands ------
-
+async def fetch_ccu(appid):
+    STEAM_API_KEY = os.getenv('STEAM_API_KEY')
+    url = f"http://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?key={STEAM_API_KEY}&appid={appid}"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            data = await response.json()
+    if data['response']['result'] == 1:
+        ccu = data['response']['player_count']
+    else:
+        ccu = 0
+    return ccu
 
 async def fetch_steam_top_sellers():
+    # Initialize SQLite Database
+    conn = sqlite3.connect('steam_top_games.db')
+    cursor = conn.cursor()
+    
+
+    # Fetch the latest timestamp from the database
+    cursor.execute("SELECT MAX(timestamp) FROM SteamTopGames")
+    latest_timestamp = cursor.fetchone()[0]
+    if latest_timestamp is not None:
+        latest_timestamp = datetime.strptime(latest_timestamp, '%Y-%m-%d %H')
+
+    # Get the current time (up to the hour)
+    current_time = datetime.now().replace(minute=0, second=0, microsecond=0)
+
+    # If there was an update within the last hour, don't update the database
+    if latest_timestamp is not None and current_time - latest_timestamp < timedelta(hours=1):
+        return
+    
+    
     url = "https://store.steampowered.com/search/?filter=globaltopsellers"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             html = await response.text()
     soup = BeautifulSoup(html, 'html.parser')
+    
     games = []
     count = 1
-    for game_div in soup.select('.search_result_row')[:10]:
+    
+    for game_div in soup.select('.search_result_row')[:250]:
+        appid = game_div['data-ds-appid']
         title_elements = game_div.select('.title')
-        price_elements = game_div.select('.discount_pct')
+        price_elements = game_div.select('.discount_final_price, .search_price')
+        discount_elements = game_div.select('.discount_pct, .search_price')
 
         title = title_elements[0].text if title_elements else "Unknown title"
+        discount = discount_elements[0].text.strip() if discount_elements else ""
         price = price_elements[0].text.strip() if price_elements else ""
-
-        if price_elements:
-            games.append(f"{count}. {title} **({price})**")
-        else:
-            games.append(f"{count}. {title}")
+        
+        if price == "Free":
+            discount = "Free"
         
         count += 1
+        
+        # Check if the appid already exists in the translation table
+        cursor.execute("SELECT game_name FROM GameTranslation WHERE appid = ?", (appid,))
+        result = cursor.fetchone()
+        
+        # If the appid doesn't exist, insert it into the translation table
+        if result is None:
+            cursor.execute("INSERT INTO GameTranslation (appid, game_name) VALUES (?, ?)", (appid, title))
+
+        timestamp = datetime.now().strftime('%Y-%m-%d %H')
+        
+        cursor.execute('''
+        INSERT INTO SteamTopGames (timestamp, place, appid, discount, ccu)
+        VALUES (?, ?, ?, ?, ?)
+        ''', (timestamp, count, appid, discount, ccu))
+        
+        # Fetch CCU using Steam API
+        ccu = fetch_ccu(appid)
+
     return games
 
 # Global Top Sellers command
@@ -133,7 +123,7 @@ async def fetch_steam_top_sellers():
 async def gts(ctx):
     top_games = await fetch_steam_top_sellers()
     response = "\n".join(top_games)
-    await ctx.send(f"**Top 10 Global Sellers on Steam:**\n{response}")
+    await ctx.send(f"**Top 250 Global Sellers on Steam:**\n{response}")
 
 # Earnings command
 @bot.command()
@@ -172,8 +162,8 @@ async def earnings(ctx, *args):
         await ctx.send(earnings_info)
 
     else:
-        # No argument, show next week's companies
-        today = datetime.now()
+        # No argument, show next week's companies including today
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) # Set the time to 00:00:00
         next_week = today + timedelta(days=7)
         next_week_companies = {date: company for date, company in date_to_company.items() if today <= date <= next_week}
         
@@ -182,12 +172,14 @@ async def earnings(ctx, *args):
         else:
             await ctx.send('No earnings in the 7 days.')
 
+
+
 # Run the bot
-load_dotenv()
 bot_token = os.getenv('BOT_TOKEN')
 
 bot.run(bot_token)
 
-
-
-## 1163373835886805013
+# Close the connection when the bot is stopped
+@bot.event
+async def on_close():
+    db.close()

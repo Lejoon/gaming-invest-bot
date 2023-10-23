@@ -31,6 +31,16 @@ class Database:
         VALUES (?, ?, ?, ?, ?)
         ''', (timestamp, place, appid, discount, ccu))
         self.conn.commit()
-
+        
+    def get_latest_timestamp(self):
+        self.cursor.execute("SELECT MAX(timestamp) FROM SteamTopGames")
+        return self.cursor.fetchone()[0]
+    
+    def update_appid(self, appid, title):
+        self.cursor.execute("SELECT game_name FROM GameTranslation WHERE appid = ?", (appid,))
+        if self.cursor.fetchone() is None:
+            self.cursor.execute("INSERT INTO GameTranslation (appid, game_name) VALUES (?, ?)", (appid, title))
+            self.conn.commit()
+    
     def close(self):
         self.conn.close()

@@ -3,10 +3,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import asyncio
-
+import time
 async def test():
     # Initialize webdriver
-    driver = webdriver.Chrome()
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")  # Run Chrome in headless mode
+    driver = webdriver.Chrome(options=options)
 
     # Navigate to the website
     driver.get('https://www.ig.com/se/index/marknader-index/')
@@ -16,6 +18,7 @@ async def test():
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices"))
     )
+    time.sleep(3)
     wait = WebDriverWait(driver, 10)
     wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#onetrust-accept-btn-handler"))).click()
 

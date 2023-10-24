@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 from discord import Embed
+import time
 
 async def seconds_until_0845():
     stockholm = pytz.timezone('Europe/Stockholm')
@@ -49,6 +50,7 @@ async def daily_message(bot):
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices"))
         )
+        time.sleep(3)
         wait = WebDriverWait(driver, 10)
         wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#onetrust-accept-btn-handler"))).click()
 

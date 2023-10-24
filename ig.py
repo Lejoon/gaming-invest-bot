@@ -55,8 +55,8 @@ async def daily_message(bot):
         )
         time.sleep(3)
         print('Looking for accept button')
-        wait = WebDriverWait(driver, 20)
-        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#onetrust-accept-btn-handler"))).click()
+        #wait = WebDriverWait(driver, 20)
+        #wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#onetrust-accept-btn-handler"))).click()
 
         interested_epics = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP"]
         # First, get the web component that hosts the shadow root

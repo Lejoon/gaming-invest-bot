@@ -47,11 +47,12 @@ async def daily_message(bot):
         print('\n'.join(html_lines[:10]))
 
 
-        WebDriverWait(driver, 10).until(
+        WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices"))
         )
         time.sleep(3)
-        wait = WebDriverWait(driver, 10)
+        print('Looking for accept button')
+        wait = WebDriverWait(driver, 20)
         wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#onetrust-accept-btn-handler"))).click()
 
         interested_epics = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP"]

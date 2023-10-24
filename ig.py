@@ -28,6 +28,9 @@ async def daily_message(bot):
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")  # Run Chrome in headless mode
         options.add_argument("--no-sandbox")
+        custom_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
+        options.add_argument(f"user-agent={custom_user_agent}")
+
 
         # Initialize the Chrome WebDriver using ChromeDriverManager
         driver = webdriver.Chrome(options=options)

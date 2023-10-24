@@ -45,12 +45,16 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
     while True:
         await asyncio.sleep(get_seconds_until(time_hour, time_minute, next_day))
         scraped_data = await get_scraped_data()
+        # If time_hour > 12 it's evening, otherwise it's morning
+        title_text = "Börsen öppnar snart!" if time_hour < 12 else "Börsen har stängt!"
+        description_text = "Indexterminerna indikerar följande per 08:30 sen senaste stäng:" if time_hour < 12 else "Indexterminerna i USA stängde följande per 22:00 och OMX har kvällsauktion:"
         embed = Embed(
-            title="Börsen öppnar snart!",
-            description="Indexterminerna indikerar följande per 08:30 sen senaste stäng:",
+            title=title_text,
+            description=description_text,
             color=0x3498db,
             timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         )
+        # Include OMX only in the morning
         for data in scraped_data:
             label = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500"}.get(data['Index'], data['Index'])
             embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)

@@ -70,7 +70,7 @@ async def send_current_index(ctx):
         title="Indexterminer",
         description="Aktuella index med fördröjning på OMX, handlas även utanför normala börstider men ej helger:",
         color=0x3498db,
-        timestamp=datetime.now(pytz.utc)
+        timestamp=datetime.now(pytz.utc),
         footer={"text": "Källa: IG.com"}
     )
 

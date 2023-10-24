@@ -47,7 +47,7 @@ async def daily_message(bot):
         html_lines = html_source.split('\n')
 
         # Return the first 10 lines (you can adjust the number)
-        print('\n'.join(html_lines[:10]))
+        print('\n'.join(html_lines[530:540]))
 
 
         WebDriverWait(driver, 20).until(

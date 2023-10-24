@@ -22,8 +22,9 @@ async def seconds_until_0845():
 async def daily_message(bot):
     channel_id = 1161207966855348246  # Replace with your channel ID
     while True:
-        await asyncio.sleep(5)
-
+        # Print number current time, seconds until 08:45 and the time if you add the seconds to the current time
+        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), await seconds_until_0845(), (datetime.now() + timedelta(seconds=await seconds_until_0845())).strftime('%Y-%m-%d %H:%M:%S'))
+        await asyncio.sleep(await seconds_until_0845())
         # Set up Chrome options
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")  # Run Chrome in headless mode
@@ -47,14 +48,14 @@ async def daily_message(bot):
         html_lines = html_source.split('\n')
 
         # Return the first 10 lines (you can adjust the number)
-        print('\n'.join(html_lines[530:540]))
+        #print('\n'.join(html_lines[530:540]))
 
 
         WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices"))
         )
         time.sleep(3)
-        print('Looking for accept button')
+        #print('Looking for accept button')
         #wait = WebDriverWait(driver, 20)
         #wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#onetrust-accept-btn-handler"))).click()
 
@@ -68,7 +69,7 @@ async def daily_message(bot):
         # Now, you can find elements inside the shadow root
         rows = shadow_root.find_elements(By.CSS_SELECTOR, '.dynamic-table__row.clickable')
 
-        print(rows)  # This should now print the elements inside the shadow root
+        #print(rows)  # This should now print the elements inside the shadow root
 
         scraped_data = []
 
@@ -82,11 +83,12 @@ async def daily_message(bot):
                     'Change Value': change_value
                 })
                 
-        embed_title = "Börsen öppnar snart"
-        embed_description = "Indexterminerna indikerar följande per 08:30:"
+        embed_title = "Börsen öppnar snart!"
+        embed_description = "Indexterminerna indikerar följande per 08:30 sen senaste stäng:"
         embed_color = 0x3498db  # You can change this to your preferred color
+        embed_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        embed = Embed(title=embed_title, description=embed_description, color=embed_color)
+        embed = Embed(title=embed_title, description=embed_description, color=embed_color, timestamp=embed_timestamp)
 
         for data in scraped_data:
             label = {

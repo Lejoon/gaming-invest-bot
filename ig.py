@@ -20,9 +20,13 @@ async def daily_message(bot):
     while True:
         await asyncio.sleep(5)
 
-        # Initialize webdriver
-        driver = webdriver.Chrome()
+        options = webdriver.ChromeOptions()
+        #Head less
+        options.add_argument("--headless")  # Run Chrome in headless mode
 
+        # Initialize webdriver
+        driver = webdriver.Chrome(options=options)
+        
         # Navigate to the website
         driver.get('https://www.ig.com/se/index/marknader-index/')
 

@@ -63,20 +63,19 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
             await channel.send(embed=embed)
             
 async def send_current_index(ctx):
-    while True:
-        scraped_data = await get_scraped_data()
-        embed = Embed(
-            title="Börserna just nu!",
-            description="Läget är som följer på börsen just nu:",
-            color=0x3498db,
-            timestamp=datetime.now(pytz.utc)
-        )
-        # Include OMX only in the morning
-        for data in scraped_data:
-            label = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500"}.get(data['Index'], data['Index'])
-            embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
-        
-        await ctx.send(embed=embed)
+    scraped_data = await get_scraped_data()
+    embed = Embed(
+        title="Börserna just nu!",
+        description="Läget är som följer på börsen just nu:",
+        color=0x3498db,
+        timestamp=datetime.now(pytz.utc)
+    )
+    # Include OMX only in the morning
+    for data in scraped_data:
+        label = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500"}.get(data['Index'], data['Index'])
+        embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
+    
+    await ctx.send(embed=embed)
 
 async def daily_message_morning(bot):
     await send_daily_message(bot, 8, 45, next_day=True)

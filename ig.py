@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service as ChromeService
 
 async def seconds_until_0845():
     stockholm = pytz.timezone('Europe/Stockholm')
@@ -25,8 +26,8 @@ async def daily_message(bot):
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")  # Run Chrome in headless mode
 
-        # Initialize the Chrome WebDriver with the service and executable path
-        driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+        # Initialize the Chrome WebDriver using ChromeDriverManager
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install(), options=options))
 
         
         # Navigate to the website

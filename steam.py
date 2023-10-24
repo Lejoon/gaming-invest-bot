@@ -75,9 +75,8 @@ async def update_steam_top_sellers(db: Database) -> dict:
     if latest_timestamp is not None and current_time - latest_timestamp < timedelta(hours=1):
         return games
 
-    for game in games:
-        db.insert_data(game['timestamp'], game['count'], game['appid'], game['discount'], game['ccu'])
-
+    db.insert_bulk_data(games)
+    
     return games
 
 async def gts_command(ctx, db: Database):

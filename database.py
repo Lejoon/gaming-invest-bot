@@ -41,6 +41,19 @@ class Database:
         if self.cursor.fetchone() is None:
             self.cursor.execute("INSERT INTO GameTranslation (appid, game_name) VALUES (?, ?)", (appid, title))
             self.conn.commit()
+            
+    def insert_bulk_data(self, games):
+        ''' 
+        Insert multiple rows in a single transaction
+        '''
+        query = '''
+        INSERT INTO SteamTopGames (timestamp, place, appid, discount, ccu)
+        VALUES (?, ?, ?, ?, ?)
+        '''
+        # Prepare data in the format required for executemany
+        data = [(game['timestamp'], game['count'], game['appid'], game['discount'], game['ccu']) for game in games]
+        self.cursor.executemany(query, data)
+        self.conn.commit()
     
     def close(self):
         self.conn.close()

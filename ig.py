@@ -65,8 +65,8 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
 async def send_current_index(ctx):
     scraped_data = await get_scraped_data()
     embed = Embed(
-        title="Börserna just nu!",
-        description="Läget är som följer på börsen just nu:",
+        title="Index just nu",
+        description="Indexterminerna, OMX fördröjning med 15 minuter:",
         color=0x3498db,
         timestamp=datetime.now(pytz.utc)
     )

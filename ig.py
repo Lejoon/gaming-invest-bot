@@ -14,10 +14,14 @@ CUSTOM_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 INTERESTED_EPICS = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP", "IX.D.FTSE.CFD.IP", "IX.D.DOW.IFD.IP", "IX.D.NASDAQ.IFD.IP"]
 LABEL_EPICS = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500", "IX.D.FTSE.CFD.IP": "FTSE 100", "IX.D.DOW.IFD.IP": "Dow Jones", "IX.D.NASDAQ.IFD.IP": "Nasdaq"}
 
-def get_seconds_until(time_hour, time_minute, next_day=False):
+def get_seconds_until(time_hour, time_minute):
     now = datetime.now()
-    day_offset = timedelta(days=1) if next_day else timedelta(days=0)
-    target_time = datetime(now.year, now.month, now.day, time_hour, time_minute) + day_offset
+    target_time = datetime(now.year, now.month, now.day, time_hour, time_minute)
+    
+    # If target time is in the past, calculate for the next day
+    if now > target_time:
+        target_time += timedelta(days=1)
+        
     return int((target_time - now).total_seconds())
 
 async def get_scraped_data():
@@ -42,9 +46,9 @@ async def get_scraped_data():
                 scraped_data.append({'Index': index, 'Change Value': change_value})
     return scraped_data
 
-async def send_daily_message(bot, time_hour, time_minute, next_day=False):
+async def send_daily_message(bot, time_hour, time_minute):
     while True:
-        await asyncio.sleep(get_seconds_until(time_hour, time_minute, next_day))
+        await asyncio.sleep(get_seconds_until(time_hour, time_minute))
         scraped_data = await get_scraped_data()
         # If time_hour > 12 it's evening, otherwise it's morning
         title_text = "\U0001F4C8 Indexterminer"
@@ -81,7 +85,7 @@ async def send_current_index(ctx):
     await ctx.send(embed=embed)
 
 async def daily_message_morning(bot):
-    await send_daily_message(bot, 8, 45, next_day=True)
+    await send_daily_message(bot, 8, 45)
 
 async def daily_message_evening(bot):
     await send_daily_message(bot, 22, 0)

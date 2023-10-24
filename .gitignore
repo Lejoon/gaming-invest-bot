@@ -1,2 +1,4 @@
 /venv
 .env
+steam_top_games.db
+/tests

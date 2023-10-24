@@ -11,7 +11,8 @@ import time
 
 CHANNEL_ID = 1161207966855348246
 CUSTOM_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
-INTERESTED_EPICS = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP"]
+INTERESTED_EPICS = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP", "IX.D.FTSE.CFD.IP", "IX.D.DOW.IFD.IP", "IX.D.NASDAQ.IFD.IP"]
+LABEL_EPICS = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500", "IX.D.FTSE.CFD.IP": "FTSE 100", "IX.D.DOW.IFD.IP": "Dow Jones", "IX.D.NASDAQ.IFD.IP": "Nasdaq"}
 
 def get_seconds_until(time_hour, time_minute, next_day=False):
     now = datetime.now()
@@ -46,17 +47,18 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
         await asyncio.sleep(get_seconds_until(time_hour, time_minute, next_day))
         scraped_data = await get_scraped_data()
         # If time_hour > 12 it's evening, otherwise it's morning
-        title_text = "Börsen öppnar snart!" if time_hour < 12 else "Börsen har stängt!"
-        description_text = "Indexterminerna indikerar följande per 08:30 sen senaste stäng:" if time_hour < 12 else "Indexterminerna i USA stängde följande per 22:00 och OMX har kvällsauktion:"
+        title_text = "Indexterminer"
+        description_text = "Snart börjar aktiehandeln, terminerna indikerar:" if time_hour < 12 else "Aktiehandeln i USA är stängd, terminerna indikerar:"
         embed = Embed(
             title=title_text,
             description=description_text,
             color=0x3498db,
-            timestamp=datetime.now(pytz.utc)
+            timestamp=datetime.now(pytz.utc),
+            footer={"text": "Källa: IG.com"}
         )
-        # Include OMX only in the morning
+
         for data in scraped_data:
-            label = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500"}.get(data['Index'], data['Index'])
+            label = LABEL_EPICS.get(data['Index'], data['Index'])
             embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
         channel = bot.get_channel(CHANNEL_ID)
         if channel:
@@ -65,14 +67,15 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
 async def send_current_index(ctx):
     scraped_data = await get_scraped_data()
     embed = Embed(
-        title="Index just nu",
-        description="Indexterminerna, OMX fördröjning med 15 minuter:",
+        title="Indexterminer",
+        description="Aktuella index med fördröjning på OMX, handlas även utanför normala börstider men ej helger:",
         color=0x3498db,
         timestamp=datetime.now(pytz.utc)
+        footer={"text": "Källa: IG.com"}
     )
-    # Include OMX only in the morning
+
     for data in scraped_data:
-        label = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500"}.get(data['Index'], data['Index'])
+        label = LABEL_EPICS.get(data['Index'], data['Index'])
         embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
     
     await ctx.send(embed=embed)

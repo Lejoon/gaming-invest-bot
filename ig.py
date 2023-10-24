@@ -53,10 +53,10 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
             title=title_text,
             description=description_text,
             color=0x3498db,
-            timestamp=datetime.now(pytz.utc),
-            footer={"text": "Källa: IG.com"}
+            timestamp=datetime.now(pytz.utc)
         )
-
+        embed.set_footer(text="Källa: IG.com")
+        
         for data in scraped_data:
             label = LABEL_EPICS.get(data['Index'], data['Index'])
             embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
@@ -70,9 +70,9 @@ async def send_current_index(ctx):
         title="Indexterminer",
         description="Aktuella index med fördröjning på OMX, handlas även utanför normala börstider men ej helger:",
         color=0x3498db,
-        timestamp=datetime.now(pytz.utc),
-        footer={"text": "Källa: IG.com"}
+        timestamp=datetime.now(pytz.utc)
     )
+    embed.set_footer(text="Källa: IG.com")
 
     for data in scraped_data:
         label = LABEL_EPICS.get(data['Index'], data['Index'])

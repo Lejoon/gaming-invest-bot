@@ -20,14 +20,12 @@ async def daily_message(bot):
     while True:
         await asyncio.sleep(5)
 
-        chrome_path = '/usr/local/bin/chrome'
-
         # Set up Chrome options
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")  # Run Chrome in headless mode
 
         # Initialize the Chrome WebDriver with the service and executable path
-        driver = webdriver.Chrome(executable_path=chrome_path, options=options)
+        driver = webdriver.Chrome(options=options)
 
         
         # Navigate to the website

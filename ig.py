@@ -47,7 +47,7 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
         await asyncio.sleep(get_seconds_until(time_hour, time_minute, next_day))
         scraped_data = await get_scraped_data()
         # If time_hour > 12 it's evening, otherwise it's morning
-        title_text = "Indexterminer"
+        title_text = "\U0001F4C8 Indexterminer"
         description_text = "Snart börjar aktiehandeln, terminerna indikerar:" if time_hour < 12 else "Aktiehandeln i USA är stängd, terminerna indikerar:"
         embed = Embed(
             title=title_text,
@@ -67,7 +67,7 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
 async def send_current_index(ctx):
     scraped_data = await get_scraped_data()
     embed = Embed(
-        title="Indexterminer",
+        title="\U0001F4C8 Indexterminer",
         description="Aktuella index med fördröjning på OMX, handlas även utanför normala börstider men ej helger:",
         color=0x3498db,
         timestamp=datetime.now(pytz.utc)

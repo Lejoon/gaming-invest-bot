@@ -20,12 +20,15 @@ async def daily_message(bot):
     while True:
         await asyncio.sleep(5)
 
+        chrome_path = '/usr/local/bin/chrome'
+
+        # Set up Chrome options
         options = webdriver.ChromeOptions()
-        #Head less
         options.add_argument("--headless")  # Run Chrome in headless mode
 
-        # Initialize webdriver
-        driver = webdriver.Chrome(options=options)
+        # Initialize the Chrome WebDriver with the service and executable path
+        driver = webdriver.Chrome(executable_path=chrome_path, options=options)
+
         
         # Navigate to the website
         driver.get('https://www.ig.com/se/index/marknader-index/')

@@ -2,6 +2,7 @@
 import websockets
 import bs4
 import discord
+from bs4 import BeautifulSoup
 
 async def fetch_mfn_updates():
     
@@ -36,7 +37,7 @@ async def fetch_mfn_updates():
         print(f"WebSocket Error: {e}")
         return  # Connection closed or other error, return to allow reconnection attempt
 
-async def websocket_background_task():
+async def websocket_background_task(bot):
     attempt_count = 0
     while True:
         try:

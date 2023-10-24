@@ -2,7 +2,8 @@ import discord
 from discord.ext import commands
 import os
 import asyncio
-
+import pytz
+from datetime import datetime, timedelta
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -37,10 +38,15 @@ async def earnings(ctx, *args):
 
 # WebSocket background task scanning MFN.se
 from mfn import websocket_background_task
+from ig import daily_message
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
-    bot.loop.create_task(websocket_background_task())  # Start the background task
+    print('Starting background websocket task.')
+    bot.loop.create_task(websocket_background_task(bot))
+    #print('Starting daily message task.') 
+    #bot.loop.create_task(daily_message(bot))  # Daily message task
+
     
 # Close the database connection when the bot is stopped
 @bot.event

@@ -25,9 +25,10 @@ async def daily_message(bot):
         # Set up Chrome options
         options = webdriver.ChromeOptions()
         options.add_argument("--headless")  # Run Chrome in headless mode
+        options.add_argument("--no-sandbox")
 
         # Initialize the Chrome WebDriver using ChromeDriverManager
-        driver = webdriver.Chrome()
+        driver = webdriver.Chrome(options=options)
 
         
         # Navigate to the website

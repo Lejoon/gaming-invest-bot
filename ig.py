@@ -36,10 +36,14 @@ async def daily_message(bot):
         driver.get('https://www.ig.com/se/index/marknader-index/')
 
         driver.execute_script("window.scrollTo(0, 800);")
-        title_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.TAG_NAME, 'title'))
-        )
-        print(title_element.text)
+        # Get the HTML source of the page
+        html_source = driver.page_source
+
+        # Split the HTML source into lines and return the first few lines
+        html_lines = html_source.split('\n')
+
+        # Return the first 10 lines (you can adjust the number)
+        print('\n'.join(html_lines[:10]))
 
 
         WebDriverWait(driver, 10).until(

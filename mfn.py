@@ -3,6 +3,7 @@ import websockets
 import bs4
 import discord
 from bs4 import BeautifulSoup
+import asyncio
 
 async def fetch_mfn_updates():
     

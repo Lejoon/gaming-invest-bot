@@ -52,7 +52,7 @@ async def send_daily_message(bot, time_hour, time_minute, next_day=False):
             title=title_text,
             description=description_text,
             color=0x3498db,
-            timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            timestamp=datetime.now(pytz.utc)
         )
         # Include OMX only in the morning
         for data in scraped_data:
@@ -69,7 +69,7 @@ async def send_current_index(ctx):
             title="Börserna just nu!",
             description="Läget är som följer på börsen just nu:",
             color=0x3498db,
-            timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            timestamp=datetime.now(pytz.utc)
         )
         # Include OMX only in the morning
         for data in scraped_data:

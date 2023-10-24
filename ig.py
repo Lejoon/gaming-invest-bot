@@ -5,25 +5,28 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 from discord import Embed
 import time
 
 async def seconds_until_0845():
     stockholm = pytz.timezone('Europe/Stockholm')
-    now = datetime.now(stockholm)
-    next_0845 = datetime(now.year, now.month, now.day, 8, 45, tzinfo=stockholm)
-    if now >= next_0845:
-        next_0845 += timedelta(days=1)
-    delta = next_0845 - now
+    now = datetime.now()
+    tomorrow = now + timedelta(days=1)
+    target_time = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 8, 45)
+    delta = target_time - now
     return delta.total_seconds()
 
 async def daily_message(bot):
     channel_id = 1161207966855348246  # Replace with your channel ID
     while True:
-        # Print number current time, seconds until 08:45 and the time if you add the seconds to the current time
-        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), await seconds_until_0845(), (datetime.now() + timedelta(seconds=await seconds_until_0845())).strftime('%Y-%m-%d %H:%M:%S'))
+        current_time = datetime.now()
+        seconds_until = await seconds_until_0845()
+        target_time = current_time + timedelta(seconds=seconds_until)
+
+        print(current_time.strftime('%Y-%m-%d %H:%M:%S'))
+        print(seconds_until)
+        print(target_time.strftime('%Y-%m-%d %H:%M:%S'))
         await asyncio.sleep(await seconds_until_0845())
         # Set up Chrome options
         options = webdriver.ChromeOptions()

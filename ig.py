@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
+from discord import Embed
 
 async def seconds_until_0845():
     stockholm = pytz.timezone('Europe/Stockholm')
@@ -35,6 +36,11 @@ async def daily_message(bot):
         driver.get('https://www.ig.com/se/index/marknader-index/')
 
         driver.execute_script("window.scrollTo(0, 800);")
+        title_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, 'title'))
+        )
+        print(title_element.text)
+
 
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices"))

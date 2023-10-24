@@ -9,106 +9,57 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from discord import Embed
 import time
 
-async def seconds_until_0845():
-    stockholm = pytz.timezone('Europe/Stockholm')
+CHANNEL_ID = 1161207966855348246
+CUSTOM_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
+INTERESTED_EPICS = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP"]
+
+def get_seconds_until(time_hour, time_minute, next_day=False):
     now = datetime.now()
-    tomorrow = now + timedelta(days=1)
-    target_time = datetime(tomorrow.year, tomorrow.month, tomorrow.day, 8, 45)
-    delta = target_time - now
-    return delta.total_seconds()
+    day_offset = timedelta(days=1) if next_day else timedelta(days=0)
+    target_time = datetime(now.year, now.month, now.day, time_hour, time_minute) + day_offset
+    return int((target_time - now).total_seconds())
 
-async def daily_message(bot):
-    channel_id = 1161207966855348246  # Replace with your channel ID
-    while True:
-        current_time = datetime.now()
-        seconds_until = await seconds_until_0845()
-        target_time = current_time + timedelta(seconds=seconds_until)
+async def get_scraped_data():
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument(f"user-agent={CUSTOM_USER_AGENT}")
 
-        print(current_time.strftime('%Y-%m-%d %H:%M:%S'))
-        print(seconds_until)
-        print(target_time.strftime('%Y-%m-%d %H:%M:%S'))
-        await asyncio.sleep(await seconds_until_0845())
-        # Set up Chrome options
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")  # Run Chrome in headless mode
-        options.add_argument("--no-sandbox")
-        custom_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
-        options.add_argument(f"user-agent={custom_user_agent}")
-
-
-        # Initialize the Chrome WebDriver using ChromeDriverManager
-        driver = webdriver.Chrome(options=options)
-
-        
-        # Navigate to the website
+    with webdriver.Chrome(options=options) as driver:
         driver.get('https://www.ig.com/se/index/marknader-index/')
-
-        driver.execute_script("window.scrollTo(0, 800);")
-        # Get the HTML source of the page
-        html_source = driver.page_source
-
-        # Split the HTML source into lines and return the first few lines
-        html_lines = html_source.split('\n')
-
-        # Return the first 10 lines (you can adjust the number)
-        #print('\n'.join(html_lines[530:540]))
-
-
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices"))
-        )
-        time.sleep(3)
-        #print('Looking for accept button')
-        #wait = WebDriverWait(driver, 20)
-        #wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#onetrust-accept-btn-handler"))).click()
-
-        interested_epics = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP"]
-        # First, get the web component that hosts the shadow root
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices")))
         web_component = driver.find_element(By.CSS_SELECTOR, 'igws-live-prices')
-
-        # Then, switch to its shadow root
         shadow_root = driver.execute_script('return arguments[0].shadowRoot', web_component)
-
-        # Now, you can find elements inside the shadow root
         rows = shadow_root.find_elements(By.CSS_SELECTOR, '.dynamic-table__row.clickable')
-
-        #print(rows)  # This should now print the elements inside the shadow root
-
+        
         scraped_data = []
-
         for row in rows:
             index_element = row.find_element(By.CSS_SELECTOR, 'a[data-epic]')
             index = index_element.get_attribute('data-epic')
-            if index in interested_epics:
+            if index in INTERESTED_EPICS:
                 change_value = row.find_element(By.CSS_SELECTOR, 'span[data-field="CPC"]').text
-                scraped_data.append({
-                    'Index': index,
-                    'Change Value': change_value
-                })
-                
-        embed_title = "Börsen öppnar snart!"
-        embed_description = "Indexterminerna indikerar följande per 08:30 sen senaste stäng:"
-        embed_color = 0x3498db  # You can change this to your preferred color
-        embed_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                scraped_data.append({'Index': index, 'Change Value': change_value})
+    return scraped_data
 
-        embed = Embed(title=embed_title, description=embed_description, color=embed_color, timestamp=embed_timestamp)
-
+async def send_daily_message(bot, time_hour, time_minute, next_day=False):
+    while True:
+        await asyncio.sleep(get_seconds_until(time_hour, time_minute, next_day))
+        scraped_data = await get_scraped_data()
+        embed = Embed(
+            title="Börsen öppnar snart!",
+            description="Indexterminerna indikerar följande per 08:30 sen senaste stäng:",
+            color=0x3498db,
+            timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        )
         for data in scraped_data:
-            label = {
-                "IX.D.OMX.IFD.IP": "OMX",
-                "IX.D.DAX.IFD.IP": "DAX",
-                "IX.D.SPTRD.IFD.IP": "SP500"
-            }.get(data['Index'], data['Index'])
-
+            label = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500"}.get(data['Index'], data['Index'])
             embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
-
-        # Close the webdriver
-        driver.quit()
-    
-        channel = bot.get_channel(channel_id)
+        channel = bot.get_channel(CHANNEL_ID)
         if channel:
             await channel.send(embed=embed)
 
+async def daily_message_morning(bot):
+    await send_daily_message(bot, 8, 45, next_day=True)
 
-
-
+async def daily_message_evening(bot):
+    await send_daily_message(bot, 22, 0)

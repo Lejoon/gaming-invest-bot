@@ -38,14 +38,16 @@ async def earnings(ctx, *args):
 
 # WebSocket background task scanning MFN.se
 from mfn import websocket_background_task
-from ig import daily_message
+from ig import daily_message_morning, daily_message_evening
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
     print('Starting background websocket task.')
     bot.loop.create_task(websocket_background_task(bot))
-    print('Starting daily message task.') 
-    bot.loop.create_task(daily_message(bot))  # Daily message task
+    print('Starting daily morning task.') 
+    bot.loop.create_task(daily_message_morning(bot))
+    print('Starting daily evening task.') 
+    bot.loop.create_task(daily_message_evening(bot))
 
     
 # Close the database connection when the bot is stopped

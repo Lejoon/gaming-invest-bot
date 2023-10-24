@@ -27,7 +27,7 @@ async def daily_message(bot):
         options.add_argument("--headless")  # Run Chrome in headless mode
 
         # Initialize the Chrome WebDriver using ChromeDriverManager
-        driver = webdriver.Chrome('/usr/local/bin', options=options)
+        driver = webdriver.Chrome('/usr/local/bin')
 
         
         # Navigate to the website

@@ -39,6 +39,7 @@ async def earnings(ctx, *args):
 # WebSocket background task scanning MFN.se
 from mfn import websocket_background_task
 from ig import daily_message_morning, daily_message_evening, current_index
+from placera import placera_updates
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
@@ -48,6 +49,8 @@ async def on_ready():
     bot.loop.create_task(daily_message_morning(bot))
     print('Starting daily evening task.') 
     bot.loop.create_task(daily_message_evening(bot))
+    print('Starting Placera telegram loop')
+    bot.loop.create_task(placera_updates(bot))
     
 @bot.command()
 async def index(ctx):

@@ -5,9 +5,9 @@ import discord
 from bs4 import BeautifulSoup
 import asyncio
 
-async def fetch_mfn_updates():
-    websocket_url = 'wss://www.mfn.se/all/s'
-    #websocket_url = 'wss://www.mfn.se/all/s?filter=(and(or(.properties.lang="sv"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
+async def fetch_mfn_updates(bot):
+    websocket_url = 'wss://mfn.se/all/s'
+    #websocket_url = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="sv"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
     try:
         async with websockets.connect(websocket_url) as ws:
             print("WebSocket connection established.")
@@ -43,7 +43,7 @@ async def websocket_background_task(bot):
     attempt_count = 0
     while True:
         try:
-            await fetch_mfn_updates()
+            await fetch_mfn_updates(bot)
             print("WebSocket connection closed.")
             attempt_count = 0  # Reset the attempt count if successfully connected
         except Exception as e:

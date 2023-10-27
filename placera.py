@@ -49,12 +49,12 @@ async def send_to_discord(title, date, url, company, bot):
         
     timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")
     print(timestamp)
-    embed = discord.Embed(title=company, description=description, timestamp=timestamp)
+    
+    embed = discord.Embed(title=company, description=title, url=url, timestamp=timestamp)
     
     if icon_url:
         embed.set_thumbnail(url=icon_url)
 
-    embed = discord.Embed(title=company, description=title, url=url, )
     if channel:
         await channel.send(embed=embed)
         print('Sent telegram item')

@@ -53,7 +53,7 @@ async def send_to_discord(title, date, url, company, bot):
     embed = discord.Embed(title=company, description=description, url=url, timestamp=timestamp)
     
     if icon_url:
-        embed.set_footer(url=icon_url)
+        embed.set_footer(icon_url=icon_url)
 
     if channel:
         await channel.send(embed=embed)

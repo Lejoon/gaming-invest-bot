@@ -1,96 +1,62 @@
-from datetime import datetime, timedelta
-import pytz
+from bs4 import BeautifulSoup
+from collections import deque
+import discord
+import datetime
 import asyncio
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service as ChromeService
-from discord import Embed
-import time
+import aiohttp
 
-CHANNEL_ID = 1161207966855348246
-CUSTOM_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
-INTERESTED_EPICS = ["IX.D.OMX.IFD.IP", "IX.D.DAX.IFD.IP", "IX.D.SPTRD.IFD.IP", "IX.D.FTSE.CFD.IP", "IX.D.DOW.IFD.IP", "IX.D.NASDAQ.IFD.IP"]
-LABEL_EPICS = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.IFD.IP": "SP500", "IX.D.FTSE.CFD.IP": "FTSE 100", "IX.D.DOW.IFD.IP": "Dow Jones", "IX.D.NASDAQ.IFD.IP": "Nasdaq"}
+TELEGRAM_CHANNEL = 1167391973825593424
 
-def get_seconds_until(time_hour, time_minute):
-    now = datetime.now()
-    target_time = datetime(now.year, now.month, now.day, time_hour, time_minute)
-    
-    # If target time is in the past, calculate for the next day
-    if now > target_time:
-        target_time += timedelta(days=1)
-        
-    return int((target_time - now).total_seconds())
+# List of companies to track (case insensitive)
+companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront']
 
-async def get_scraped_data():
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument(f"user-agent={CUSTOM_USER_AGENT}")
+# Create a deque with a maximum size to store the recently seen articles
+max_queue_size = 100
+seen_articles = deque(maxlen=max_queue_size)
 
-    with webdriver.Chrome(options=options) as driver:
-        driver.get('https://www.ig.com/se/index/marknader-index/')
-        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices")))
-        web_component = driver.find_element(By.CSS_SELECTOR, 'igws-live-prices')
-        shadow_root = driver.execute_script('return arguments[0].shadowRoot', web_component)
-        rows = shadow_root.find_elements(By.CSS_SELECTOR, '.dynamic-table__row.clickable')
-        
-        scraped_data = []
-        for row in rows:
-            index_element = row.find_element(By.CSS_SELECTOR, 'a[data-epic]')
-            index = index_element.get_attribute('data-epic')
-            if index in INTERESTED_EPICS:
-                change_value = row.find_element(By.CSS_SELECTOR, 'span[data-field="CPC"]').text
-                scraped_data.append({'Index': index, 'Change Value': change_value})
-    return scraped_data
+async def send_to_discord(title, date, url, company, bot):
+    channel = bot.get_channel(TELEGRAM_CHANNEL)  # Replace with your channel ID
+    embed = discord.Embed(title=company, description=title, url=url, timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M"))
+    if channel:
+        await channel.send(embed=embed)
+        print('Sent telegram item')
 
-async def send_daily_message(bot, time_hour, time_minute):
+async def fetch_page(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.text()
+
+async def check_for_placera_updates(bot):
     while True:
-        await asyncio.sleep(get_seconds_until(time_hour, time_minute))
-        scraped_data = await get_scraped_data()
-        # If time_hour > 12 it's evening, otherwise it's morning
-        title_text = "\U0001F4C8 Indexterminer"
-        description_text = "Snart börjar aktiehandeln, terminerna indikerar:" if time_hour < 12 else "Aktiehandeln i USA stänger, terminerna indikerar:"
-        embed = Embed(
-            title=title_text,
-            description=description_text,
-            color=0x3498db,
-            timestamp=datetime.now(pytz.utc)
-        )
-        embed.set_footer(text="Källa: IG.com")
-        
-        for data in scraped_data:
-            label = LABEL_EPICS.get(data['Index'], data['Index'])
-            embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
+        await asyncio.sleep(30)
+        url = 'https://www.placera.se/placera/telegram.html'
+        page_content = await fetch_page(url)
+        soup = BeautifulSoup(page_content, 'html.parser')
+
+        ul_list = soup.find('ul', {'class': 'feedArticleList XSText'})
+
+        for li in ul_list.find_all('li', {'class': 'item'}):
+            a_tag = li.find('a')
+            relative_url = a_tag['href']
+            full_url = f'http://www.placera.se{relative_url}'
             
-        channel = bot.get_channel(CHANNEL_ID)
-        if channel:
-            await channel.send(embed=embed)
-            print('Sent daily index')   
-async def send_current_index(ctx):
-    scraped_data = await get_scraped_data()
-    embed = Embed(
-        title="\U0001F4C8 Indexterminer",
-        description="Aktuella index med fördröjning på OMX, handlas även utanför normala börstider men ej helger:",
-        color=0x3498db,
-        timestamp=datetime.now(pytz.utc)
-    )
-    embed.set_footer(text="Källa: IG.com")
+            intro_div = a_tag.find('div', {'class': 'intro'})
+            company_span = intro_div.find('span', {'class': 'bold'})
+            
+            company = company_span.text.strip().rstrip(":") if company_span else None
+            title = intro_div.text.strip()
+            date = li.find('span', {'class': 'date'}).text.strip()
 
-    for data in scraped_data:
-        label = LABEL_EPICS.get(data['Index'], data['Index'])
-        embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
-    
-    await ctx.send(embed=embed)
-    print('Sent current index')
+            article_id = date + title
 
-async def daily_message_morning(bot):
-    await send_daily_message(bot, 8, 55)
+            if article_id not in seen_articles:
+                for tracked_company in companies_to_track:
+                    if company and tracked_company.lower() in company.lower():
+                        print(f'Found news item regarding {company}')
+                        await send_to_discord(title, date, full_url, company, bot)
+                        break
+                
+                seen_articles.append(article_id)
 
-async def daily_message_evening(bot):
-    await send_daily_message(bot, 21, 59)
-    
-async def current_index(ctx):
-    await send_current_index(ctx)
+async def placera_updates(bot):
+    await check_for_placera_updates(bot)

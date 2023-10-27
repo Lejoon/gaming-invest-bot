@@ -5,6 +5,8 @@ import discord
 from bs4 import BeautifulSoup
 import asyncio
 
+PRESS_RELEASES_CHANNEL = 1163373835886805013
+
 async def fetch_mfn_updates(bot):
     websocket_url = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="sv"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
     try:
@@ -30,7 +32,7 @@ async def fetch_mfn_updates(bot):
 
                 # Fetch a Discord channel by its ID (replace 'your_channel_id_here' with the actual channel ID)
 
-                channel = bot.get_channel(1163373835886805013)
+                channel = bot.get_channel(PRESS_RELEASES_CHANNEL)
                 if channel:
                     await channel.send(embed=embed)
                     

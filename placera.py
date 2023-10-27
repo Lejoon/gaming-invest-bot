@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 from collections import deque
 import discord
-import datetime
+from datetime import datetime
 import asyncio
 import aiohttp
 

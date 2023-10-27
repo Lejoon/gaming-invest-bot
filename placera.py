@@ -40,12 +40,17 @@ def load_seen_articles():
 seen_articles = load_seen_articles()
 
 async def send_to_discord(title, date, url, company, bot):
-    channel = bot.get_channel(TELEGRAM_CHANNEL)  # Replace with your channel ID
+    channel = bot.get_channel(TELEGRAM_CHANNEL)
+    
+    description, icon_url = get_icon_from_description(title)
+    print(description, icon_url)
     if company:
         title = title.replace(f"{company}:", "").strip()
+        
     timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")
-    description, icon_url = get_icon_from_description(title)
+    print(timestamp)
     embed = discord.Embed(title=company, description=description, timestamp=timestamp)
+    
     if icon_url:
         embed.set_thumbnail(url=icon_url)
 

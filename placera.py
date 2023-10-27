@@ -5,7 +5,20 @@ from datetime import datetime
 import asyncio
 import aiohttp
 import pickle
+import re
+
 TELEGRAM_CHANNEL = 1167391973825593424
+icon_dict = {
+    'Finwire': 'https://finwire.com/wp-content/uploads/2021/03/1.5-FINWIRE-Logotype-Bird-Icon-2020-PMS021-300x300.png',
+    'Direkt': 'https://media.licdn.com/dms/image/C560BAQFerUMPTdDrAA/company-logo_200_200/0/1569249859285/nyhetsbyr_n_direkt_logo?e=1706745600&v=beta&t=YUjFmqgCdSjIebxklnaYep7RfaKL9vLhfJdJNBA594Q',
+}
+
+def get_icon_from_description(description):
+    for key in icon_dict:
+        if key in description:
+            description = re.sub(rf'\({key}\)', '', description).strip()
+            return description, icon_dict[key]
+    return description, None
 
 # List of companies to track (case insensitive)
 companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront']
@@ -30,8 +43,13 @@ async def send_to_discord(title, date, url, company, bot):
     channel = bot.get_channel(TELEGRAM_CHANNEL)  # Replace with your channel ID
     if company:
         title = title.replace(f"{company}:", "").strip()
-    
-    embed = discord.Embed(title=company, description=title, url=url, timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M"))
+    timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")
+    description, icon_url = get_icon_from_description(title)
+    embed = discord.Embed(title=company, description=description, timestamp=timestamp)
+    if icon_url:
+        embed.set_thumbnail(url=icon_url)
+
+    embed = discord.Embed(title=company, description=title, url=url, )
     if channel:
         await channel.send(embed=embed)
         print('Sent telegram item')

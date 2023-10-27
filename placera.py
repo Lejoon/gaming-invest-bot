@@ -17,8 +17,9 @@ def get_icon_from_description(description):
     for key in icon_dict:
         if key in description:
             description = re.sub(rf'\({key}\)', '', description).strip()
-            return description, icon_dict[key]
-    return description, None
+            print(icon_dict[key])
+            return key, description, icon_dict[key]
+    return key, description, None
 
 # List of companies to track (case insensitive)
 companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront']
@@ -45,8 +46,7 @@ async def send_to_discord(title, date, url, company, bot):
     if company:
         title = title.replace(f"{company}:", "").strip()
     
-    description, icon_url = get_icon_from_description(title)
-    print(description, icon_url)
+    key, description, icon_url = get_icon_from_description(title)
         
     timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")
     print(timestamp)
@@ -54,7 +54,7 @@ async def send_to_discord(title, date, url, company, bot):
     embed = discord.Embed(title=company, description=description, url=url, timestamp=timestamp)
     
     if icon_url:
-        embed.set_footer(icon_url=icon_url)
+        embed.set_footer(text=key, icon_url=icon_url)
 
     if channel:
         await channel.send(embed=embed)

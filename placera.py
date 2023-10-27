@@ -4,7 +4,7 @@ import discord
 from datetime import datetime
 import asyncio
 import aiohttp
-
+import pickle
 TELEGRAM_CHANNEL = 1167391973825593424
 
 # List of companies to track (case insensitive)
@@ -12,10 +12,25 @@ companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'En
 
 # Create a deque with a maximum size to store the recently seen articles
 max_queue_size = 100
-seen_articles = deque(maxlen=max_queue_size)
+
+def save_seen_articles():
+    with open('seen_articles.pkl', 'wb') as f:
+        pickle.dump(seen_articles, f)
+
+def load_seen_articles():
+    try:
+        with open('seen_articles.pkl', 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        return deque(maxlen=max_queue_size)
+
+seen_articles = load_seen_articles()
 
 async def send_to_discord(title, date, url, company, bot):
     channel = bot.get_channel(TELEGRAM_CHANNEL)  # Replace with your channel ID
+    if company:
+        title = title.replace(f"{company}:", "").strip()
+    
     embed = discord.Embed(title=company, description=title, url=url, timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M"))
     if channel:
         await channel.send(embed=embed)
@@ -57,6 +72,7 @@ async def check_for_placera_updates(bot):
                         break
                 
                 seen_articles.append(article_id)
+                save_seen_articles()
 
 async def placera_updates(bot):
     await check_for_placera_updates(bot)

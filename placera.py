@@ -42,10 +42,11 @@ seen_articles = load_seen_articles()
 async def send_to_discord(title, date, url, company, bot):
     channel = bot.get_channel(TELEGRAM_CHANNEL)
     
-    description, icon_url = get_icon_from_description(title)
-    print(description, icon_url)
     if company:
         title = title.replace(f"{company}:", "").strip()
+    
+    description, icon_url = get_icon_from_description(title)
+    print(description, icon_url)
         
     timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")
     print(timestamp)

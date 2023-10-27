@@ -10,7 +10,7 @@ import re
 TELEGRAM_CHANNEL = 1167391973825593424
 icon_dict = {
     'Finwire': 'https://finwire.com/wp-content/uploads/2021/03/1.5-FINWIRE-Logotype-Bird-Icon-2020-PMS021-300x300.png',
-    'Direkt': 'URL_TO_DIREKT_ICON',
+    'Direkt': 'https://media.licdn.com/dms/image/C560BAQFerUMPTdDrAA/company-logo_200_200/0/1569249859285/nyhetsbyr_n_direkt_logo?e=1706745600&v=beta&t=YUjFmqgCdSjIebxklnaYep7RfaKL9vLhfJdJNBA594Q',
 }
 
 def get_icon_from_description(description):

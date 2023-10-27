@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 import asyncio
 
 async def fetch_mfn_updates():
-    
-    websocket_url = 'wss://www.mfn.se/all/s?filter=(and(or(.properties.lang="sv"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
+    websocket_url = 'wss://www.mfn.se/all/s'
+    #websocket_url = 'wss://www.mfn.se/all/s?filter=(and(or(.properties.lang="sv"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
     try:
         async with websockets.connect(websocket_url) as ws:
             print("WebSocket connection established.")
@@ -24,12 +24,13 @@ async def fetch_mfn_updates():
                 author_url = soup.find("a", class_="title-link author-link author-preview")['href']
                 title = soup.find("a", class_="title-link item-link").text
                 title_url = "http://www.mfn.se"+soup.find("a", class_="title-link item-link")['href']
-
+                print(f'Fetched news {title} from MFN')
                 # Create an embedded message
                 embed = discord.Embed(title=author, url=title_url, description=title, color=0x00ff00)
                 #embed = discord.Embed(title=title, url=title_url, description=f"Author: [{author}]({author_url})\nDate: {date}\nTime: {time}", color=0x00ff00)
 
                 # Fetch a Discord channel by its ID (replace 'your_channel_id_here' with the actual channel ID)
+
                 channel = bot.get_channel(1163373835886805013)
                 if channel:
                     await channel.send(embed=embed)

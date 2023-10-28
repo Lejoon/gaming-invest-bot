@@ -49,6 +49,12 @@ async def get_scraped_data():
 async def send_daily_message(bot, time_hour, time_minute):
     while True:
         await asyncio.sleep(get_seconds_until(time_hour, time_minute))
+        
+        current_day = datetime.now().weekday()
+        if current_day in [5, 6]:
+            print("It's the weekend. Skipping the daily message.")
+            continue
+        
         scraped_data = await get_scraped_data()
         # If time_hour > 12 it's evening, otherwise it's morning
         title_text = "\U0001F4C8 Indexterminer"

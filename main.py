@@ -40,6 +40,7 @@ async def earnings(ctx, *args):
 from mfn import websocket_background_task
 from ig import daily_message_morning, daily_message_evening, current_index
 from placera import placera_updates
+from steam import daily_steam_database_refresh
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
@@ -51,6 +52,8 @@ async def on_ready():
     bot.loop.create_task(daily_message_evening(bot))
     print('Starting Placera telegram loop')
     bot.loop.create_task(placera_updates(bot))
+    print('Start Steam Daily loop')
+    bot.loop.create_task(daily_steam_database_refresh())
     
 @bot.command()
 async def index(ctx):

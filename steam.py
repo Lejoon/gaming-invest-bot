@@ -4,8 +4,18 @@ import aiohttp
 from bs4 import BeautifulSoup
 import os
 from database import Database
-
+import asyncio
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
+
+def get_seconds_until(time_hour, time_minute):
+    now = datetime.now()
+    target_time = datetime(now.year, now.month, now.day, time_hour, time_minute)
+    
+    # If target time is in the past, calculate for the next day
+    if now > target_time:
+        target_time += timedelta(days=1)
+        
+    return int((target_time - now).total_seconds())
 
 async def fetch_ccu(appid):
     url = f"http://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?key={STEAM_API_KEY}&appid={appid}"
@@ -87,3 +97,12 @@ async def gts_command(ctx, db: Database):
         for game in top_games
     )
     await ctx.send(f"**Top 15 Global Sellers on Steam:**\n{response}")
+
+async def daily_steam_database_refresh(db: Database):
+    while True:
+        # Calculate the number of seconds until 21:00
+        await asyncio.sleep(get_seconds_until(21, 0))
+
+        # Perform the database update
+        await update_steam_top_sellers(db)
+        print('Database updated with Steam top sellers.')

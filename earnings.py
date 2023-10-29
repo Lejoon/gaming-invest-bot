@@ -1,41 +1,27 @@
 from datetime import datetime, timedelta
 import re
+import json
 
-date_to_company = {
-    datetime(2023, 9, 13): "Frontier Developments",
-    datetime(2023, 9, 16): "Gamestop",
-    datetime(2023, 9, 19): "Team17",
-    datetime(2023, 9, 21): "People Can Fly",
-    datetime(2023, 9, 25): "Devolver Digital",
-    datetime(2023, 9, 26): "tinyBuild",
-    datetime(2023, 9, 27): "Digital Bros/505 Games",
-    datetime(2023, 9, 29): "CI Games",
-    datetime(2023, 10, 16): "DON'T NOD",
-    datetime(2023, 10, 18): "Netflix",
-    datetime(2023, 10, 19): "Focus Entertainment",
-    datetime(2023, 10, 24): "Microsoft",
-    datetime(2023, 10, 26): ["Capcom", "Ubisoft", "Paradox Interactive"],
-    datetime(2023, 10, 30): ["NACON", "KOEI Tecmo"],
-    datetime(2023, 10, 31): "Remedy",
-    datetime(2023, 11, 1): "EA",
-    datetime(2023, 11, 2): ["Kadokawa", "Paramount", "Konami"],
-    datetime(2023, 11, 7): ["Bandai Namco", "Nintendo"],
-    datetime(2023, 11, 8): ["Take-Two*", "SEGA Sammy", "Disney", "Roblox", "Warner Discovery"],
-    datetime(2023, 11, 9): ["NEXON", "Square Enix*", "Krafton*", "Sony"],
-    datetime(2023, 11, 14): "Bloober Team*",
-    datetime(2023, 11, 15): ["Tencent", "NetEase*", "Maximum Entertainment", "Thunderful Group"],
-    datetime(2023, 11, 16): ["Embracer Group", "Starbreeze"],
-    datetime(2023, 11, 23): "11bit Studios",
-    datetime(2023, 11, 28): "CD Projekt Group",
-}
+with open('earnings_dict.json', 'r') as f:
+    date_to_company = json.load(f)
+
+with open('company_url_dict.json', 'r') as f:
+    company_to_url = json.load(f)
+
+date_to_company = {datetime.strptime(date, '%Y-%m-%d'): companies for date, companies in date_to_company.items()}
+
 
 def list_to_sentence(lst):
+    def company_to_markdown(company):
+        url = company_to_url.get(company, "")
+        return f"[**{company}**]({url})" if url else f"**{company}**"
+
     if len(lst) == 1:
-        return f"**{lst[0]}**"
+        return company_to_markdown(lst[0])
     elif len(lst) == 2:
-        return f"**{lst[0]}** and **{lst[1]}**"
+        return f"{company_to_markdown(lst[0])} and {company_to_markdown(lst[1])}"
     else:
-        return ', '.join([f"**{company}**" for company in lst[:-1]]) + f", and **{lst[-1]}**"
+        return ', '.join([company_to_markdown(company) for company in lst[:-1]]) + f", and {company_to_markdown(lst[-1])}"
 
 async def earnings_command(ctx, *args):
     valid_formats = [
@@ -88,7 +74,7 @@ async def earnings_command(ctx, *args):
                     
                 sentences.append(f"{date.strftime('%A, %Y-%m-%d')}: {companies_str}")
 
-            final_output = 'Here are the gaming companeis with earnings for the next 7 days:\n' + '\n'.join(sentences)
+            final_output = 'Here are the gaming companies with earnings for the next 7 days:\n' + '\n'.join(sentences)
             await ctx.send(final_output)
         else:
             await ctx.send('No earnings in the next 7 days.')

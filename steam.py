@@ -124,12 +124,14 @@ async def gts_command(ctx, db: Database):
               
         response.append(line)
     
-    await ctx.send(f"**Top 15 Global Sellers on Steam:**\n{response}")
+    joined_response = '\n'.join(response)
+    await ctx.send(f"**Top 15 Global Sellers on Steam:**\n{joined_response}")
 
 async def daily_steam_database_refresh(db: Database):
     while True:
-        # Calculate the number of seconds until 21:00
+        print(f'[LOG] Waiting until {datetime.now().strftime("%Y-%m-%d %H:%M:%S") + get_seconds_until(21,0)} to update database.')
         await asyncio.sleep(get_seconds_until(21, 0))
+        
 
         # Perform the database update
         await update_steam_top_sellers(db)

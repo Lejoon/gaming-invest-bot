@@ -129,7 +129,9 @@ async def gts_command(ctx, db: Database):
 
 async def daily_steam_database_refresh(db: Database):
     while True:
-        print(f'[LOG] Waiting until {datetime.now().strftime("%Y-%m-%d %H:%M:%S") + get_seconds_until(21,0)} to update database.')
+        log_time = datetime.now()
+        log_time += timedelta(seconds=get_seconds_until(21,0))
+        print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to update database.')
         await asyncio.sleep(get_seconds_until(21, 0))
         
 

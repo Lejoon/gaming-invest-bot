@@ -93,11 +93,15 @@ async def send_current_index(ctx):
     print('Sent current index')
 
 async def daily_message_morning(bot):
-    print(f'[LOG] Waiting until {datetime.now().strftime("%Y-%m-%d %H:%M:%S") + get_seconds_until(8,55)} to send morning message.')
+    log_time = datetime.now()
+    log_time += timedelta(seconds=get_seconds_until(8,55))
+    print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send evening message.')
     await send_daily_message(bot, 8, 55)
 
 async def daily_message_evening(bot):
-    print(f'[LOG] Waiting until {datetime.now().strftime("%Y-%m-%d %H:%M:%S") + get_seconds_until(21,59)} to evening message.')
+    log_time = datetime.now()
+    log_time += timedelta(seconds=get_seconds_until(21,59))
+    print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send evening message.')
     await send_daily_message(bot, 21, 59)
     
 async def current_index(ctx):

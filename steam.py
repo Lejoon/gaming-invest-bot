@@ -105,12 +105,14 @@ async def gts_command(ctx, db: Database):
         title = game['title']
         discount = game['discount']
         ccu = game['ccu']
-        place_yesterday = yesterday_games.get(game['appid'], 'N/A')
         
-        # Add + or - depending on sign of pplace_yesterday - place
-        place_delta = place_yesterday - place
-        place_delta_str = "+" + str(place_delta) if place_delta > 0 else str(place_delta)
+        # Convert place_yesterday to an integer
+        place_yesterday = int(place_yesterday) if place_yesterday != 'N/A' else None
         
+        # Add + or - depending on sign of place_yesterday - place
+        place_delta = place_yesterday - place if place_yesterday is not None else None
+        place_delta_str = "+" + str(place_delta) if place_delta is not None and place_delta > 0 else str(place_delta)
+            
         if place_yesterday:
             line = f"{place}. ({place_delta_str}) {title}"
         else:

@@ -91,11 +91,36 @@ async def update_steam_top_sellers(db: Database) -> dict:
 
 async def gts_command(ctx, db: Database):
     top_games = await update_steam_top_sellers(db)
+    
+    latest_timestamp = db.get_latest_timestamp()
+    yesterday_games = db.get_yesterday_top_games(latest_timestamp)
+    
     top_games = top_games[:15]
-    response = "\n".join(
-        f"{game['count']}. {game['title']}" + (f" ({game['discount']})" if game['discount'] else "")
-        for game in top_games
-    )
+    
+    response = []
+    
+    for game in top_games:
+        # Construct the line for each game
+        place = game['count']
+        title = game['title']
+        discount = game['discount']
+        ccu = game['ccu']
+        place_yesterday = yesterday_games.get(game['appid'], 'N/A')
+        
+        # Add + or - depending on sign of pplace_yesterday - place
+        place_delta = place_yesterday - place
+        place_delta_str = "+" + str(place_delta) if place_delta > 0 else str(place_delta)
+        
+        if place_yesterday:
+            line = f"{place}. ({place_delta_str}) {title}"
+        else:
+            line = f"{place}. {title}"
+        
+        if ccu:
+            line += f" (CCU: {ccu})"
+              
+        response.append(line)
+    
     await ctx.send(f"**Top 15 Global Sellers on Steam:**\n{response}")
 
 async def daily_steam_database_refresh(db: Database):
@@ -106,3 +131,4 @@ async def daily_steam_database_refresh(db: Database):
         # Perform the database update
         await update_steam_top_sellers(db)
         print('Database updated with Steam top sellers.')
+        

@@ -53,7 +53,7 @@ async def on_ready():
     print('Starting Placera telegram loop')
     bot.loop.create_task(placera_updates(bot))
     print('Start Steam Daily loop')
-    bot.loop.create_task(daily_steam_database_refresh())
+    bot.loop.create_task(daily_steam_database_refresh(db))
     
 @bot.command()
 async def index(ctx):

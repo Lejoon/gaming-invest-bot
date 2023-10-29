@@ -53,6 +53,7 @@ async def send_daily_message(bot, time_hour, time_minute):
         current_day = datetime.now().weekday()
         if current_day in [5, 6]:
             print("It's the weekend. Skipping the daily message.")
+            await asyncio.sleep(60 * 60)  # Sleep for 24 hours
             continue
         
         scraped_data = await get_scraped_data()

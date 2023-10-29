@@ -90,6 +90,12 @@ async def update_steam_top_sellers(db: Database) -> dict:
     return games
 
 async def gts_command(ctx, db: Database):
+    def format_ccu(ccu):
+        if ccu >= 1000:
+            return f"{ccu // 1000}k"  # Integer division by 1000
+        else:
+            return str(ccu)  # Keep the original number if it's less than 1000
+
     top_games = await update_steam_top_sellers(db)
     
     latest_timestamp = db.get_latest_timestamp()
@@ -113,14 +119,15 @@ async def gts_command(ctx, db: Database):
         # Add + or - depending on sign of place_yesterday - place
         place_delta = place_yesterday - place if place_yesterday is not None else None
         place_delta_str = "+" + str(place_delta) if place_delta is not None and place_delta > 0 else str(place_delta)
-            
+
         if place_yesterday:
             line = f"{place}. ({place_delta_str}) {title}"
         else:
             line = f"{place}. {title}"
         
         if ccu:
-            line += f" (CCU: {ccu})"
+            formated_ccu = format_ccu(ccu)
+            line += f" (CCU: {formated_ccu})"
               
         response.append(line)
     

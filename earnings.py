@@ -12,16 +12,12 @@ date_to_company = {datetime.strptime(date, '%Y-%m-%d'): companies for date, comp
 
 
 def list_to_sentence(lst):
-    def company_to_markdown(company):
-        url = company_to_url.get(company, "")
-        return f"[**{company}**]({url})" if url else f"**{company}**"
-
     if len(lst) == 1:
-        return company_to_markdown(lst[0])
+        return f"_{lst[0]}_"
     elif len(lst) == 2:
-        return f"{company_to_markdown(lst[0])} and {company_to_markdown(lst[1])}"
+        return f"_{lst[0]}_ and _{lst[1]}_"
     else:
-        return ', '.join([company_to_markdown(company) for company in lst[:-1]]) + f", and {company_to_markdown(lst[-1])}"
+        return ', '.join([f"_{company}_" for company in lst[:-1]]) + f", and _{lst[-1]}_"
 
 async def earnings_command(ctx, *args):
     valid_formats = [

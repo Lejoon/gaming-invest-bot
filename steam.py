@@ -105,7 +105,8 @@ async def gts_command(ctx, db: Database):
         title = game['title']
         discount = game['discount']
         ccu = game['ccu']
-        
+        place_yesterday = yesterday_games.get(game['appid'], 'N/A')
+
         # Convert place_yesterday to an integer
         place_yesterday = int(place_yesterday) if place_yesterday != 'N/A' else None
         

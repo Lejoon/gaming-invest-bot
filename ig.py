@@ -95,7 +95,7 @@ async def send_current_index(ctx):
 async def daily_message_morning(bot):
     log_time = datetime.now()
     log_time += timedelta(seconds=get_seconds_until(8,55))
-    print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send evening message.')
+    print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send morning message.')
     await send_daily_message(bot, 8, 55)
 
 async def daily_message_evening(bot):

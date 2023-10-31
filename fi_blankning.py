@@ -76,7 +76,7 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
     changed_positions = changed_positions[['company_name', 'lei', 'position_percent_x', 'latest_position_date_x']]
     changed_positions.columns = ['company_name', 'lei', 'position_percent', 'latest_position_date']
     
-    new_leis['timestamp'] = fetched_timestamp
+    new_leis.loc[:, 'timestamp'] = fetched_timestamp
     changed_positions['timestamp'] = fetched_timestamp
     new_rows = pd.concat([new_leis, changed_positions])
 
@@ -104,7 +104,7 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 
                 description = f"Ändrad blankning: {new_position_percent}%"
                 if change is not None:
-                    description = f" (+{change:+.2f})" if change > 0 else f" ({change:+.2f})"
+                    description += f" ({change:+.2f})" if change > 0 else f" ({change:-.2f})"
                     
                 embed = Embed(
                     title=company_name, 
@@ -112,7 +112,7 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
                     url=f"https://www.fi.se/sv/vara-register/blankningsregistret/emittent/?id={lei}",
                     timestamp=datetime.strptime(timestamp, "%Y-%m-%d %H:%M")
                 )
-                embed.set_footer(text="FI", icon_url="https://www.fi.se/static/gfx/images/fi-logotyp.svg")
+                embed.set_footer(text="FI", icon_url="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Financial_Supervisory_Authority_%28Sweden%29_logo.svg/320px-Financial_Supervisory_Authority_%28Sweden%29_logo.svg.png")
 
                 if channel:
                     await channel.send(embed=embed)

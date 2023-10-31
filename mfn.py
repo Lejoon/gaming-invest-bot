@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 PRESS_RELEASES_CHANNEL = 1163373835886805013
 
 async def fetch_mfn_updates(bot):
-    websocket_url = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="sv"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
+    websocket_url = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="en"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
     try:
         async with websockets.connect(websocket_url) as ws:
             print("WebSocket connection established.")
@@ -22,12 +22,14 @@ async def fetch_mfn_updates(bot):
                 # Extract the required information
                 date = soup.find("span", class_="compressed-date").text
                 time = soup.find("span", class_="compressed-time").text
+                time = time[:-3]
                 author = soup.find("a", class_="title-link author-link author-preview").text
                 author_url = soup.find("a", class_="title-link author-link author-preview")['href']
                 title = soup.find("a", class_="title-link item-link").text
                 title_url = "http://www.mfn.se"+soup.find("a", class_="title-link item-link")['href']
                 print(f'Fetched news {title} from MFN')
                 # Create an embedded message
+    
                 embed = discord.Embed(title=author, url=title_url, description=title, color=0x00ff00, timestamp=datetime.strptime(date+" "+time, "%Y-%m-%d %H:%M"))
                 #embed = discord.Embed(title=title, url=title_url, description=f"Author: [{author}]({author_url})\nDate: {date}\nTime: {time}", color=0x00ff00)
 

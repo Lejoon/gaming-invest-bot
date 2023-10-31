@@ -117,6 +117,26 @@ async def manual_update(db):
 
     print('Database updated with new shorts if any.')
 
+# Command that returns the current short position for a given company name. It tries to match the company name at the best possible level, could be just partly or in another case. 
+async def short_command(ctx, db, company_name):
+    company_name = company_name.lower()
+    
+    query = f"""
+    SELECT position_percent, timestamp
+    FROM ShortPositions
+    WHERE LOWER(company_name) LIKE '%{company_name}%'
+    ORDER BY timestamp DESC
+    LIMIT 1
+    """
+    
+    result = db.cursor.execute(query).fetchone()
+
+    if result:
+        position_percent, timestamp = result
+        await ctx.send(f"The latest short position for {company_name} is {position_percent}% at {timestamp}.")
+    else:
+        await ctx.send(f"No short position found for {company_name}.")
+        
 # Entry point
 if __name__ == "__main__":
     db = Database('steam_top_games.db')  # Replace with your actual DB name

@@ -29,6 +29,12 @@ from steam import gts_command
 @bot.command()
 async def gts(ctx):
     await gts_command(ctx, db)
+
+# Short seller command
+from fi_blankning import short_command    
+@bot.command()
+async def short(ctx, company_name):
+    await short_command(ctx, db, company_name)
     
 # Earnings command
 from earnings import earnings_command

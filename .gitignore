@@ -5,3 +5,4 @@ last_known_timestamp.txt
 Blankningsregisteraggregat.ods
 tests/
 .DS_Store
+__pycache__/

@@ -80,7 +80,7 @@ class Database:
             INSERT INTO ShortPositions (timestamp, company_name, lei, position_percent, latest_position_date)
             VALUES (?, ?, ?, ?, ?);
             '''
-            data = [(row['timestamp'],row['company_name'].strip(), row['lei'], row['position_percent'], row['latest_position_date']) for _, row in input.iterrows()]
+            data = [(row['timestamp'],row['company_name'], row['lei'], row['position_percent'], row['latest_position_date']) for _, row in input.iterrows()]
 
 
         self.cursor.executemany(query, data)

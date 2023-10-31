@@ -37,8 +37,11 @@ class Database:
         self.conn.commit()
         
     def get_latest_timestamp(self, table):
-        # Get the latest timestamp from the database and table specified
-        self.cursor.execute("SELECT MAX(timestamp) FROM ?", (table,))
+        if not table.isidentifier():
+            raise ValueError(f"Invalid table name: {table}")
+
+        query = f"SELECT MAX(timestamp) FROM {table}"
+        self.cursor.execute(query)
         return self.cursor.fetchone()[0]
     
     def get_yesterday_top_games(self, timestamp):

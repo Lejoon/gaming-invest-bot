@@ -57,7 +57,7 @@ def read_new_data(file_path):
 
 # Function to update the database based on the differences between old and new data
 def update_database_diff(old_data, new_data, db, fetched_timestamp):
-    
+
     if old_data.empty:
         new_data['timestamp'] = fetched_timestamp  # Add the fetched timestamp
         db.insert_bulk_data(input=new_data, table='ShortPositions')
@@ -66,16 +66,18 @@ def update_database_diff(old_data, new_data, db, fetched_timestamp):
     new_leis = new_data.loc[~new_data['lei'].isin(old_data['lei'])]
     common_leis = new_data.loc[new_data['lei'].isin(old_data['lei'])]
 
-    changed_positions = pd.merge(common_leis, old_data, on='lei')
-    changed_positions = changed_positions[changed_positions['position_percent_x'] != changed_positions['position_percent_y']]
+    changed_positions = pd.merge(common_leis, old_data, on=['lei','company_name'])
 
+    changed_positions = changed_positions[changed_positions['position_percent_x'] != changed_positions['position_percent_y']]
+    changed_positions = changed_positions[['company_name', 'lei', 'position_percent_x', 'latest_position_date_x']]
+    changed_positions.columns = ['company_name', 'lei', 'position_percent', 'latest_position_date']
+    
     new_leis['timestamp'] = fetched_timestamp
     changed_positions['timestamp'] = fetched_timestamp
     new_rows = pd.concat([new_leis, changed_positions])
 
     # Insert new and updated records
     db.insert_bulk_data(input=new_rows, table='ShortPositions')
-
 
 
 # Main asynchronous loop to update the database at intervals
@@ -98,6 +100,7 @@ async def update_fi_from_web(db):
         
         await download_ods_file(URL, ODS_FILE_PATH)
         new_data = read_new_data(ODS_FILE_PATH)
+
         old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
         update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp)
         

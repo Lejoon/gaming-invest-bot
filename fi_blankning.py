@@ -90,6 +90,7 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
             company_name = row['company_name']
             new_position_percent = row['position_percent']
             lei = row['lei']
+            timestamp = row['timestamp']
 
             # Check for exact matches in companies_to_track
             if company_name in companies_to_track:
@@ -109,8 +110,9 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
                     title=company_name, 
                     description=description,
                     url=f"https://www.fi.se/sv/vara-register/blankningsregistret/emittent/?id={lei}",
+                    timestamp=datetime.strptime(timestamp, "%Y-%m-%d %H:%M")
                 )
-                embed.set_footer(text=f"FI")
+                embed.set_footer(text="FI", icon_url="https://www.fi.se/static/gfx/images/fi-logotyp.svg")
 
                 if channel:
                     await channel.send(embed=embed)

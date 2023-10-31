@@ -1,21 +1,12 @@
 import sqlite3
 from datetime import datetime, timedelta
+from general_utils import get_seconds_until
 import aiohttp
 from bs4 import BeautifulSoup
 import os
 from database import Database
 import asyncio
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
-
-def get_seconds_until(time_hour, time_minute):
-    now = datetime.now()
-    target_time = datetime(now.year, now.month, now.day, time_hour, time_minute)
-    
-    # If target time is in the past, calculate for the next day
-    if now > target_time:
-        target_time += timedelta(days=1)
-        
-    return int((target_time - now).total_seconds())
 
 async def fetch_ccu(appid):
     url = f"http://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?key={STEAM_API_KEY}&appid={appid}"
@@ -73,7 +64,7 @@ async def update_steam_top_sellers(db: Database) -> dict:
         games.append(game_data)
         
         # Fetch the latest timestamp from the database
-    latest_timestamp = db.get_latest_timestamp()
+    latest_timestamp = db.get_latest_timestamp('SteamTopGames')
     
     if latest_timestamp is not None:
         latest_timestamp = datetime.strptime(latest_timestamp, '%Y-%m-%d %H')
@@ -98,7 +89,7 @@ async def gts_command(ctx, db: Database):
 
     top_games = await update_steam_top_sellers(db)
     
-    latest_timestamp = db.get_latest_timestamp()
+    latest_timestamp = db.get_latest_timestamp('SteamTopGames')
     yesterday_games = db.get_yesterday_top_games(latest_timestamp)
     
     top_games = top_games[:15]
@@ -118,7 +109,13 @@ async def gts_command(ctx, db: Database):
         
         # Add + or - depending on sign of place_yesterday - place
         place_delta = place_yesterday - place if place_yesterday is not None else None
-        place_delta_str = "+" + str(place_delta) if place_delta is not None and place_delta > 0 else str(place_delta)
+        
+        if place_delta is not None and place_delta > 0:
+            place_delta_str = "+" + str(place_delta)
+        elif place_delta is not None and place_delta == 0:
+            place_delta_str = "-"
+        else:
+            place_delta_str = str(place_delta)
 
         if place_yesterday:
             line = f"{place}. ({place_delta_str}) {title}"

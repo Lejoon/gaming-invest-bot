@@ -24,17 +24,21 @@ class Database:
             ccu INTEGER
         );
         ''')
-        self.conn.commit()
-
-    def insert_data(self, timestamp, place, appid, discount, ccu):
-        self.cursor.execute('''
-        INSERT INTO SteamTopGames (timestamp, place, appid, discount, ccu)
-        VALUES (?, ?, ?, ?, ?)
-        ''', (timestamp, place, appid, discount, ccu))
+        self.cursor.execute('''    
+        CREATE TABLE IF NOT EXISTS ShortPositions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME,
+                company_name TEXT NOT NULL,
+                lei TEXT,
+                position_percent REAL,
+                latest_position_date TEXT
+        );
+        ''')
         self.conn.commit()
         
-    def get_latest_timestamp(self):
-        self.cursor.execute("SELECT MAX(timestamp) FROM SteamTopGames")
+    def get_latest_timestamp(self, table):
+        # Get the latest timestamp from the database and table specified
+        self.cursor.execute("SELECT MAX(timestamp) FROM ?", (table,))
         return self.cursor.fetchone()[0]
     
     def get_yesterday_top_games(self, timestamp):
@@ -56,18 +60,71 @@ class Database:
             self.cursor.execute("INSERT INTO GameTranslation (appid, game_name) VALUES (?, ?)", (appid, title))
             self.conn.commit()
             
-    def insert_bulk_data(self, games):
+    def insert_bulk_data(self, input, table='SteamTopGames'):
         ''' 
         Insert multiple rows in a single transaction
         '''
-        query = '''
-        INSERT INTO SteamTopGames (timestamp, place, appid, discount, ccu)
-        VALUES (?, ?, ?, ?, ?)
-        '''
-        # Prepare data in the format required for executemany
-        data = [(game['timestamp'], game['count'], game['appid'], game['discount'], game['ccu']) for game in games]
+        
+        if table == 'SteamTopGames':
+            query = '''
+            INSERT INTO SteamTopGames (timestamp, place, appid, discount, ccu)
+            VALUES (?, ?, ?, ?, ?)
+            '''
+            data = [(game['timestamp'], game['count'], game['appid'], game['discount'], game['ccu']) for game in input]
+
+        if table == 'ShortPositions':
+            query = '''
+            INSERT INTO ShortPositions (timestamp, company_name, lei, position_percent, latest_position_date)
+            VALUES (?, ?, ?, ?, ?);
+            '''
+            data = [(row['timestamp'],row['company_name'].strip(), row['lei'], row['position_percent'], row['latest_position_date']) for _, row in input.iterrows()]
+
+
         self.cursor.executemany(query, data)
         self.conn.commit()
+        
+    def fetch_current_short_position(self, company_name):
+        query = '''
+                SELECT * FROM ShortPositions
+                WHERE TRIM(company_name) = ?
+                ORDER BY timestamp DESC
+                LIMIT 1;
+                '''
+        self.cursor.execute(query, (company_name.strip(),))
+        result = self.cursor.fetchone()
+        
+        if result:
+            return {
+                'id': result[0],
+                'timestamp': result[1],
+                'company_name': result[2].strip(),
+                'lei': result[3],
+                'position_percent': result[4],
+                'latest_position_date': result[5]
+            }
+        else:
+            return None   
+        
+    def fetch_historical_short_positions(self, company_name):
+        query = '''
+                SELECT * FROM ShortPositions
+                WHERE TRIM(company_name) = ?
+                ORDER BY timestamp ASC;
+                '''
+        self.cursor.execute(query, (company_name.strip(),))
+        results = self.cursor.fetchall()
+        
+        if results:
+            return [{
+                'id': row[0],
+                'timestamp': row[1],
+                'company_name': row[2].strip(),
+                'lei': row[3],
+                'position_percent': row[4],
+                'latest_position_date': row[5]
+            } for row in results]
+        else:
+            return None
     
     def close(self):
         self.conn.close()

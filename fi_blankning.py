@@ -139,7 +139,7 @@ async def update_fi_from_web(db, bot):
         new_data = read_new_data(ODS_FILE_PATH)
 
         old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
-        update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
+        await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
         
         print('Database updated with new shorts if any.')
         await asyncio.sleep(DELAY_TIME)

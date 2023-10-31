@@ -122,18 +122,17 @@ async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
     
     query = f"""
-    SELECT position_percent, timestamp
+    SELECT company_name, position_percent, timestamp
     FROM ShortPositions
     WHERE LOWER(company_name) LIKE '%{company_name}%'
     ORDER BY timestamp DESC
     LIMIT 1
     """
-    
     result = db.cursor.execute(query).fetchone()
 
     if result:
-        position_percent, timestamp = result
-        await ctx.send(f"The latest short position for {company_name} is {position_percent}% at {timestamp}.")
+        db_company_name, position_percent, timestamp = result
+        await ctx.send(f"The latest short position for {db_company_name} is {position_percent}% at {timestamp}.")
     else:
         await ctx.send(f"No short position found for {company_name}.")
         

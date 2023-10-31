@@ -5,13 +5,17 @@ from aiohttp import ClientSession
 from database import Database  # Assuming you've already defined this class
 from bs4 import BeautifulSoup
 import os
-
+from discord import Embed
 # Constants
 URL = 'https://www.fi.se/sv/vara-register/blankningsregistret/GetBlankningsregisterAggregat/'
 TIMESTAMP_URL = 'https://www.fi.se/sv/vara-register/blankningsregistret/'
 ODS_FILE_PATH = 'Blankningsregisteraggregat.ods'
 DELAY_TIME = 15 * 60  # 15 minutes
 TIMESTAMP_FILE = 'last_known_timestamp.txt'
+CHANNEL_ID = 1167391973825593424
+
+companies_to_track = ['Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB', 'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive', 'G5 Entertainment AB (publ)', 'Modern Times Group MTG AB', 'Thunderful', 'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)']
+
 
 def read_last_known_timestamp(file_path):
     try:
@@ -25,7 +29,7 @@ def write_last_known_timestamp(file_path, timestamp):
         f.write(timestamp)
 
 async def fetch_last_update_time():
-    global last_known_timestamp
+    global last_known_timestamp 
     async with ClientSession() as session:
         async with session.get(TIMESTAMP_URL) as response:
             content = await response.text()
@@ -56,7 +60,7 @@ def read_new_data(file_path):
     return df
 
 # Function to update the database based on the differences between old and new data
-def update_database_diff(old_data, new_data, db, fetched_timestamp):
+async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 
     if old_data.empty:
         new_data['timestamp'] = fetched_timestamp  # Add the fetched timestamp
@@ -78,10 +82,41 @@ def update_database_diff(old_data, new_data, db, fetched_timestamp):
 
     # Insert new and updated records
     db.insert_bulk_data(input=new_rows, table='ShortPositions')
+    
+    if not new_rows.empty:
+        channel = bot.get_channel(CHANNEL_ID)
 
+        for _, row in new_rows.iterrows():
+            company_name = row['company_name']
+            new_position_percent = row['position_percent']
+            lei = row['lei']
+
+            # Check for exact matches in companies_to_track
+            if company_name in companies_to_track:
+                # Find the old position for this company if available
+                old_position_data = old_data.loc[old_data['company_name'] == company_name]
+                old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
+
+                change = None
+                if old_position_percent is not None:
+                    change = new_position_percent - old_position_percent
+
+                description = f"Ändrad blankning: {new_position_percent}%"
+                if change is not None:
+                    description = f" (+{change:+.2f})" if change > 0 else f" ({change:+.2f})"
+                    
+                embed = Embed(
+                    title=company_name, 
+                    description=description,
+                    url=f"https://www.fi.se/sv/vara-register/blankningsregistret/emittent/?id={lei}",
+                )
+                embed.set_footer(text=f"FI")
+
+                if channel:
+                    await channel.send(embed=embed)
 
 # Main asynchronous loop to update the database at intervals
-async def update_fi_from_web(db):
+async def update_fi_from_web(db, bot):
     last_known_timestamp = read_last_known_timestamp(TIMESTAMP_FILE)
     
     while True:

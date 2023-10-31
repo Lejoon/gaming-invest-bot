@@ -84,16 +84,16 @@ async def update_fi_from_web(db):
     
     while True:
         web_timestamp = await fetch_last_update_time()
-        print(web_timestamp)
+        next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
+
         if web_timestamp == last_known_timestamp:
-            print(f'[LOG] Web timestamp unchanged ({web_timestamp}). Waiting.')
+            print(f'[LOG] Web timestamp unchanged ({web_timestamp}). Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
             await asyncio.sleep(DELAY_TIME)
             continue
 
         last_known_timestamp = web_timestamp
         write_last_known_timestamp(TIMESTAMP_FILE, web_timestamp)
         
-        next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
         print(f'[LOG] New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
         
         await download_ods_file(URL, ODS_FILE_PATH)

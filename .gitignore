@@ -1,6 +1,7 @@
 venv/
 .env
 steam_top_games.db
+last_known_timestamp.txt
+Blankningsregisteraggregat.ods
 tests/
-.gitignore
 .DS_Store

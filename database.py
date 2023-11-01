@@ -3,6 +3,12 @@ import sqlite3
 from datetime import datetime, timedelta
 
 class Database:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        
     def __init__(self, db_name):
         self.conn = sqlite3.connect(db_name)
         self.cursor = self.conn.cursor()

@@ -67,8 +67,8 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
         db.insert_bulk_data(input=new_data, table='ShortPositions')
         return
     
-    old_data = old_data.sort_values('latest_position_date').drop_duplicates(['lei', 'company_name'], keep='last')
-    new_data = new_data.sort_values('latest_position_date').drop_duplicates(['lei', 'company_name'], keep='last')
+    old_data = old_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
+    new_data = new_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
     
     print('Old data:' + str(old_data))
     print('New data:' + str(new_data))

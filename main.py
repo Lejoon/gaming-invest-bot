@@ -61,8 +61,8 @@ async def on_ready():
     bot.loop.create_task(placera_updates(bot))
     print('Start Steam Daily loop')
     bot.loop.create_task(daily_steam_database_refresh(db))
-    #print('Start FI Blankning loop')
-    #bot.loop.create_task(update_fi_from_web(db, bot))
+    print('Start FI Blankning loop')
+    bot.loop.create_task(update_fi_from_web(db, bot))
     
 @bot.command()
 async def index(ctx):

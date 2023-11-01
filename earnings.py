@@ -41,8 +41,12 @@ async def earnings_command(ctx, *args):
         elif re.match(r'\d{4}\d{2}', date_str):
             month_companies = {date: company for date, company in date_to_company.items() if date.strftime('%Y%m') == date_str}
             if month_companies:
-                companies = ', '.join([company for sublist in month_companies.values() for company in sublist])
-                await ctx.send(f"{date.strftime('%Y-%m-%d')}: {companies}")
+                for date, companies_list in month_companies.items():
+                    if isinstance(companies_list, list):
+                        companies = list_to_sentence(companies_list)
+                    else:
+                        companies = f"**{companies_list}**"
+                    await ctx.send(f"{date.strftime('%Y-%m-%d')}: {companies}")
                 return
             else:
                 await ctx.send('No earnings in this month.')

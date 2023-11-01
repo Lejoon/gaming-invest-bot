@@ -76,7 +76,9 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
     changed_positions = changed_positions[['company_name', 'lei', 'position_percent_x', 'latest_position_date_x']]
     changed_positions.columns = ['company_name', 'lei', 'position_percent', 'latest_position_date']
     
-    new_leis.loc[:, 'timestamp'] = fetched_timestamp
+    # Should probably be changed to a more efficient way of doing this
+    if not new_leis.empty:
+        new_leis.loc[:, 'timestamp'] = fetched_timestamp
     changed_positions['timestamp'] = fetched_timestamp
     new_rows = pd.concat([new_leis, changed_positions])
 

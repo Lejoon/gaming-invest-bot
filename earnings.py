@@ -41,7 +41,7 @@ async def earnings_command(ctx, *args):
         elif re.match(r'\d{4}\d{2}', date_str):
             month_companies = {date: company for date, company in date_to_company.items() if date.strftime('%Y%m') == date_str}
             if month_companies:
-                companies = ', '.join(month_companies.values())
+                companies = ', '.join([company for sublist in month_companies.values() for company in sublist])
                 await ctx.send(f"{date.strftime('%Y-%m-%d')}: {companies}")
                 return
             else:

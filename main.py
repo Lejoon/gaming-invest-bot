@@ -47,7 +47,7 @@ from mfn import websocket_background_task
 from ig import daily_message_morning, daily_message_evening, current_index
 from placera import placera_updates
 from steam import daily_steam_database_refresh
-import fi_blankning import update_fi_from_web
+from fi_blankning import update_fi_from_web
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")

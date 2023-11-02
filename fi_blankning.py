@@ -12,6 +12,8 @@ from general_utils import retry_with_backoff
 # Constants
 URLS = {
     'DATA': 'https://www.fi.se/sv/vara-register/blankningsregistret/GetBlankningsregisterAggregat/',
+    'TIMESTAMP': 'https://www.fi.se/sv/vara-register/blankningsregistret/'
+
 }
 FILE_PATHS = {'DATA': 'Blankningsregisteraggregat.ods', 'TIMESTAMP': 'last_known_timestamp.txt'}
 DELAY_TIME = 15*60

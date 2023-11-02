@@ -33,6 +33,17 @@ async def aiohttp_session():
 async def fetch_url(session, url):
     async with session.get(url) as response:
         return await response.text()
+    
+def read_last_known_timestamp(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return None
+    
+def write_last_known_timestamp(file_path, timestamp):
+    with open(file_path, 'w') as f:
+        f.write(timestamp)
 
 @retry_with_backoff
 async def fetch_last_update_time(session):
@@ -40,7 +51,6 @@ async def fetch_last_update_time(session):
     soup = BeautifulSoup(content, 'html.parser')
     timestamp_text = soup.find('p', string=lambda text: 'Listan uppdaterades:' in text if text else False)
     return timestamp_text.string.split(": ")[1] if timestamp_text else None
-
 
 async def download_file(session, url, path):
     content = await fetch_url(session, url)
@@ -100,7 +110,7 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
             timestamp = row['timestamp']
 
             # Check for exact matches in companies_to_track
-            if company_name in companies_to_track:
+            if company_name in TRACKED_COMPANIES:
                 # Find the old position for this company if available
                 old_position_data = old_data.loc[old_data['company_name'] == company_name]
                 old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
@@ -123,155 +133,46 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 
                 if channel:
                     await channel.send(embed=embed)
-
-
-# ----------------
-
-
-def read_last_known_timestamp(file_path):
-    try:
-        with open(file_path, 'r') as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return None
-    
-def write_last_known_timestamp(file_path, timestamp):
-    with open(file_path, 'w') as f:
-        f.write(timestamp)
-
-async def fetch_last_update_time():
-    global last_known_timestamp 
-    async with ClientSession() as session:
-        async with session.get(TIMESTAMP_URL) as response:
-            content = await response.text()
-            soup = BeautifulSoup(content, 'html.parser')
-            timestamp_text = soup.find('p', string=lambda text: 'Listan uppdaterades:' in text if text else False)
-            if timestamp_text:
-                last_known_timestamp = timestamp_text.string.split(": ")[1]
-                return last_known_timestamp
-            else:
-                return None
-
-
-# Asynchronous function to download the ODS file
-async def download_ods_file(url, save_path):
-    async with ClientSession() as session:
-        async with session.get(url) as response:
-            with open(save_path, 'wb') as f:
-                f.write(await response.read())
-
-# Function to read the new data from the ODS file into a DataFrame
-def read_new_data(file_path):
-    df = pd.read_excel(file_path, sheet_name='Blad1', skiprows=5, engine="odf")
-    df.columns = ['company_name', 'lei', 'position_percent', 'latest_position_date']
-    df['company_name'] = df['company_name'].str.strip()  # Remove leading and trailing whitespaces
-
-    #remove the ods file
-    os.remove(file_path)
-    return df
-
-# Function to update the database based on the differences between old and new data
-async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
-
-    if old_data.empty:
-        new_data['timestamp'] = fetched_timestamp  # Add the fetched timestamp
-        db.insert_bulk_data(input=new_data, table='ShortPositions')
-        return
-    
-    if not new_data.empty:
-        new_data['timestamp'] = fetched_timestamp
-        
-    old_data = old_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
-    new_data = new_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
-    
-    new_leis = new_data.loc[~new_data['lei'].isin(old_data['lei'])]
-    common_leis = new_data.loc[new_data['lei'].isin(old_data['lei'])]
-
-    changed_positions = pd.merge(common_leis, old_data, on=['lei','company_name'])
-    changed_positions = changed_positions[changed_positions['position_percent_x'] != changed_positions['position_percent_y']]
-    changed_positions = changed_positions[['company_name', 'lei', 'position_percent_x', 'latest_position_date_x']]
-    changed_positions.columns = ['company_name', 'lei', 'position_percent', 'latest_position_date']
-    
-    # Should probably be changed to a more efficient way of doing this
-    if not new_leis.empty:
-        new_leis.loc[:, 'timestamp'] = fetched_timestamp
-    changed_positions['timestamp'] = fetched_timestamp
-    new_rows = pd.concat([new_leis, changed_positions])
-    print('New rows:' + str(new_rows))
-
-    # Insert new and updated records
-    db.insert_bulk_data(input=new_rows, table='ShortPositions')
-    
-    if not new_rows.empty:
-        channel = bot.get_channel(CHANNEL_ID)
-
-        for _, row in new_rows.iterrows():
-            company_name = row['company_name']
-            new_position_percent = row['position_percent']
-            lei = row['lei']
-            timestamp = row['timestamp']
-
-            # Check for exact matches in companies_to_track
-            if company_name in companies_to_track:
-                # Find the old position for this company if available
-                old_position_data = old_data.loc[old_data['company_name'] == company_name]
-                old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
-
-                change = None
-                if old_position_percent is not None:
-                    change = new_position_percent - old_position_percent
-
-                description = f"Ändrad blankning: {new_position_percent}%"
-                if change is not None:
-                    description += f" ({change:+.2f})" if change > 0 else f" ({change:-.2f})"
                     
-                embed = Embed(
-                    title=company_name, 
-                    description=description,
-                    url=f"https://www.fi.se/sv/vara-register/blankningsregistret/emittent/?id={lei}",
-                    timestamp=datetime.strptime(timestamp, "%Y-%m-%d %H:%M")
-                )
-                embed.set_footer(text="FI", icon_url="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Financial_Supervisory_Authority_%28Sweden%29_logo.svg/320px-Financial_Supervisory_Authority_%28Sweden%29_logo.svg.png")
-
-                if channel:
-                    await channel.send(embed=embed)
-
 # Main asynchronous loop to update the database at intervals
 async def update_fi_from_web(db, bot):
-    last_known_timestamp = read_last_known_timestamp(TIMESTAMP_FILE)
-    
     while True:
-        web_timestamp = await fetch_last_update_time()
-        next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
+        async with aiohttp_session() as session:
+            last_known_timestamp = read_last_known_timestamp(URLS['TIMESTAMP'])
+            web_timestamp = await fetch_last_update_time(session)
+            next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
 
-        if web_timestamp == last_known_timestamp:
-            print(f'[LOG] Web timestamp unchanged ({web_timestamp}). Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+            if web_timestamp == last_known_timestamp:
+                print(f'[LOG] Web timestamp unchanged ({web_timestamp}). Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+                await asyncio.sleep(DELAY_TIME)
+                continue
+
+            last_known_timestamp = web_timestamp
+            write_last_known_timestamp(URLS['TIMESTAMP'], web_timestamp)
+            
+            print(f'[LOG] New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+            
+            await download_file(session, URLS['DATA'], FILE_PATHS['DATA'])
+            new_data = read_data(FILE_PATHS['DATA'])
+
+            old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
+            await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
+            
+            print('Database updated with new shorts if any.')
             await asyncio.sleep(DELAY_TIME)
-            continue
-
-        last_known_timestamp = web_timestamp
-        write_last_known_timestamp(TIMESTAMP_FILE, web_timestamp)
-        
-        print(f'[LOG] New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
-        
-        await download_ods_file(URL, ODS_FILE_PATH)
-        new_data = read_new_data(ODS_FILE_PATH)
-
-        old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
-        await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
-        
-        print('Database updated with new shorts if any.')
-        await asyncio.sleep(DELAY_TIME)
 
 
 async def manual_update(db):
-    await download_ods_file(URL, ODS_FILE_PATH)
-    new_data = read_new_data(ODS_FILE_PATH)
-    old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
+    async with aiohttp_session() as session:
+        await download_file(session,URLS['DATA'], FILE_PATHS['DATA'])
+        new_data = read_data(FILE_PATHS['DATA'])
+        old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
 
-    update_database_diff(old_data, new_data, db)
+        update_database_diff(old_data, new_data, db)
 
-    print('Database updated with new shorts if any.')
+        print('Database updated with new shorts if any.')
+
+
 
 # Command that returns the current short position for a given company name. It tries to match the company name at the best possible level, could be just partly or in another case. 
 async def short_command(ctx, db, company_name):

@@ -12,7 +12,6 @@ from general_utils import retry_with_backoff
 # Constants
 URLS = {
     'DATA': 'https://www.fi.se/sv/vara-register/blankningsregistret/GetBlankningsregisterAggregat/',
-    'TIMESTAMP': 'https://www.fi.se/sv/vara-register/blankningsregistret/'
 }
 FILE_PATHS = {'DATA': 'Blankningsregisteraggregat.ods', 'TIMESTAMP': 'last_known_timestamp.txt'}
 DELAY_TIME = 15*60
@@ -138,7 +137,7 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 async def update_fi_from_web(db, bot):
     while True:
         async with aiohttp_session() as session:
-            last_known_timestamp = read_last_known_timestamp(URLS['TIMESTAMP'])
+            last_known_timestamp = read_last_known_timestamp(FILE_PATHS['TIMESTAMP'])
             web_timestamp = await fetch_last_update_time(session)
             next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
 
@@ -148,7 +147,7 @@ async def update_fi_from_web(db, bot):
                 continue
 
             last_known_timestamp = web_timestamp
-            write_last_known_timestamp(URLS['TIMESTAMP'], web_timestamp)
+            write_last_known_timestamp(FILE_PATHS['TIMESTAMP'], web_timestamp)
             
             print(f'[LOG] New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
             

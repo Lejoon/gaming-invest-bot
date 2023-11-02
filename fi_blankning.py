@@ -74,12 +74,22 @@ async def download_file(session, url, path):
 def read_data(path):
     df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
     os.remove(path)
-    return df.rename(columns={
-        'Bolagsnamn': 'company_name',
-        'LEI': 'lei',
-        'Position i procent': 'position_percent',
-        'Senast rapporterade positionens dag': 'latest_position_date'
-    }).assign(company_name=lambda x: x['company_name'].str.strip())
+    
+    # Rename columns by position: [0] -> 'company_name', [1] -> 'lei', etc.
+    new_column_names = {
+        df.columns[0]: 'company_name',
+        df.columns[1]: 'lei',
+        df.columns[2]: 'position_percent',
+        df.columns[3]: 'latest_position_date'
+    }
+    
+    # Only rename columns that exist in the DataFrame
+    new_column_names = {k: v for k, v in new_column_names.items() if k in df.columns}
+    
+    if 'company_name' in df.columns:
+        df['company_name'] = df['company_name'].str.strip()
+    
+    return df
 
 
 # Function to update the database based on the differences between old and new data

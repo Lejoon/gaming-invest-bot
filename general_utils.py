@@ -13,25 +13,22 @@ def get_seconds_until(time_hour, time_minute):
         
     return int((target_time - now).total_seconds())
 
-async def retry_with_backoff(func, *args, retries=5, base_delay=1.0, max_delay=60.0):
-    """
-    Retry a function with exponential backoff.
-
-    Parameters:
-    - func: The function to retry. It should be a coroutine.
-    - *args: Arguments to pass to the function.
-    - retries: The maximum number of retries before giving up. Default is 5.
-    - base_delay: The base delay in seconds. Default is 1.0.
-    - max_delay: The maximum delay in seconds. Default is 60.0.
-    """
-    for retry in range(retries):
-        try:
-            return await func(*args)
-        except aiohttp.ClientConnectorError as e:
-            if retry == retries - 1:  # If this was the last retry
-                raise  # Re-raise the last exception
-            else:
-                # Calculate delay: base_delay * 2 ^ retry, but randomized to spread out the load
-                delay = min(max_delay, base_delay * 2 ** retry) * (0.5 + random.random())
-                print('Awaiting retry in', delay, 'seconds.')
-                await asyncio.sleep(delay)
+def retry_with_backoff(retries=5, base_delay=1.0, max_delay=60.0):
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            nonlocal retries, base_delay, max_delay
+            for attempt in range(retries):
+                try:
+                    # Call the function and immediately return if successful
+                    return await func(*args, **kwargs)
+                except aiohttp.ClientConnectorError as e:
+                    if attempt == retries - 1:  # If this was the last retry
+                        raise  # Re-raise the last exception
+                    else:
+                        # Calculate delay: base_delay * 2 ^ attempt, but with a random factor to avoid thundering herd problem
+                        delay = min(max_delay, base_delay * 2 ** attempt) * (0.5 + random.random())
+                        print(f'Awaiting {delay:.2f} seconds before retrying...')
+                        await asyncio.sleep(delay)
+            return await func(*args, **kwargs)  # Try one last time
+        return wrapper
+    return decorator

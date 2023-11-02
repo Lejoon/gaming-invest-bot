@@ -82,7 +82,8 @@ def read_data(path):
         df.columns[2]: 'position_percent',
         df.columns[3]: 'latest_position_date'
     }
-    
+    df.rename(columns=new_column_names, inplace=True)
+
     # Only rename columns that exist in the DataFrame
     new_column_names = {k: v for k, v in new_column_names.items() if k in df.columns}
     

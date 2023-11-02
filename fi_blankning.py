@@ -15,7 +15,7 @@ URLS = {
     'TIMESTAMP': 'https://www.fi.se/sv/vara-register/blankningsregistret/'
 }
 FILE_PATHS = {'DATA': 'Blankningsregisteraggregat.ods', 'TIMESTAMP': 'last_known_timestamp.txt'}
-DELAY_TIME = timedelta(minutes=15)
+DELAY_TIME = 15*60
 CHANNEL_ID = 1167391973825593424
 TRACKED_COMPANIES = set([
     'Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB',

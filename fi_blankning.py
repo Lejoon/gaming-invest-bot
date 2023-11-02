@@ -1,20 +1,131 @@
-import pandas as pd
 from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
 import asyncio
-from aiohttp import ClientSession
-from database import Database  # Assuming you've already defined this class
-from bs4 import BeautifulSoup
 import os
+import pandas as pd
+from aiohttp import ClientSession
+from bs4 import BeautifulSoup
 from discord import Embed
-# Constants
-URL = 'https://www.fi.se/sv/vara-register/blankningsregistret/GetBlankningsregisterAggregat/'
-TIMESTAMP_URL = 'https://www.fi.se/sv/vara-register/blankningsregistret/'
-ODS_FILE_PATH = 'Blankningsregisteraggregat.ods'
-DELAY_TIME = 15 * 60  # 15 minutes
-TIMESTAMP_FILE = 'last_known_timestamp.txt'
-CHANNEL_ID = 1167391973825593424
+from database import Database  # Assuming Database class is already defined
+from general_utils import retry_with_backoff
 
-companies_to_track = ['Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB', 'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive', 'G5 Entertainment AB (publ)', 'Modern Times Group MTG AB', 'Thunderful', 'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)']
+# Constants
+URLS = {
+    'DATA': 'https://www.fi.se/sv/vara-register/blankningsregistret/GetBlankningsregisterAggregat/',
+    'TIMESTAMP': 'https://www.fi.se/sv/vara-register/blankningsregistret/'
+}
+FILE_PATHS = {'DATA': 'Blankningsregisteraggregat.ods', 'TIMESTAMP': 'last_known_timestamp.txt'}
+DELAY_TIME = timedelta(minutes=15)
+CHANNEL_ID = 1167391973825593424
+TRACKED_COMPANIES = set([
+    'Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB',
+    'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive',
+    'G5 Entertainment AB (publ)', 'Modern Times Group MTG AB', 'Thunderful',
+    'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)'
+])
+
+@asynccontextmanager
+async def aiohttp_session():
+    async with ClientSession() as session:
+        yield session
+
+
+async def fetch_url(session, url):
+    async with session.get(url) as response:
+        return await response.text()
+
+@retry_with_backoff
+async def fetch_last_update_time(session):
+    content = await fetch_url(session, URLS['TIMESTAMP'])
+    soup = BeautifulSoup(content, 'html.parser')
+    timestamp_text = soup.find('p', string=lambda text: 'Listan uppdaterades:' in text if text else False)
+    return timestamp_text.string.split(": ")[1] if timestamp_text else None
+
+
+async def download_file(session, url, path):
+    content = await fetch_url(session, url)
+    with open(path, 'wb') as f:
+        f.write(content)
+        
+def read_data(path):
+    df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
+    os.remove(path)
+    return df.rename(columns={
+        'Bolagsnamn': 'company_name',
+        'LEI': 'lei',
+        'Position i procent': 'position_percent',
+        'Senast rapporterade positionens dag': 'latest_position_date'
+    }).assign(company_name=lambda x: x['company_name'].str.strip())
+
+
+# Function to update the database based on the differences between old and new data
+async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
+
+    if old_data.empty:
+        new_data['timestamp'] = fetched_timestamp  # Add the fetched timestamp
+        db.insert_bulk_data(input=new_data, table='ShortPositions')
+        return
+    
+    if not new_data.empty:
+        new_data['timestamp'] = fetched_timestamp
+        
+    old_data = old_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
+    new_data = new_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
+    
+    new_leis = new_data.loc[~new_data['lei'].isin(old_data['lei'])]
+    common_leis = new_data.loc[new_data['lei'].isin(old_data['lei'])]
+
+    changed_positions = pd.merge(common_leis, old_data, on=['lei','company_name'])
+    changed_positions = changed_positions[changed_positions['position_percent_x'] != changed_positions['position_percent_y']]
+    changed_positions = changed_positions[['company_name', 'lei', 'position_percent_x', 'latest_position_date_x']]
+    changed_positions.columns = ['company_name', 'lei', 'position_percent', 'latest_position_date']
+    
+    # Should probably be changed to a more efficient way of doing this
+    if not new_leis.empty:
+        new_leis.loc[:, 'timestamp'] = fetched_timestamp
+    changed_positions['timestamp'] = fetched_timestamp
+    new_rows = pd.concat([new_leis, changed_positions])
+    print('New rows:' + str(new_rows))
+
+    # Insert new and updated records
+    db.insert_bulk_data(input=new_rows, table='ShortPositions')
+    
+    if not new_rows.empty:
+        channel = bot.get_channel(CHANNEL_ID)
+
+        for _, row in new_rows.iterrows():
+            company_name = row['company_name']
+            new_position_percent = row['position_percent']
+            lei = row['lei']
+            timestamp = row['timestamp']
+
+            # Check for exact matches in companies_to_track
+            if company_name in companies_to_track:
+                # Find the old position for this company if available
+                old_position_data = old_data.loc[old_data['company_name'] == company_name]
+                old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
+
+                change = None
+                if old_position_percent is not None:
+                    change = new_position_percent - old_position_percent
+
+                description = f"Ändrad blankning: {new_position_percent}%"
+                if change is not None:
+                    description += f" ({change:+.2f})" if change > 0 else f" ({change:-.2f})"
+                    
+                embed = Embed(
+                    title=company_name, 
+                    description=description,
+                    url=f"https://www.fi.se/sv/vara-register/blankningsregistret/emittent/?id={lei}",
+                    timestamp=datetime.strptime(timestamp, "%Y-%m-%d %H:%M")
+                )
+                embed.set_footer(text="FI", icon_url="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Financial_Supervisory_Authority_%28Sweden%29_logo.svg/320px-Financial_Supervisory_Authority_%28Sweden%29_logo.svg.png")
+
+                if channel:
+                    await channel.send(embed=embed)
+
+
+# ----------------
 
 
 def read_last_known_timestamp(file_path):
@@ -80,8 +191,6 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
     changed_positions = changed_positions[changed_positions['position_percent_x'] != changed_positions['position_percent_y']]
     changed_positions = changed_positions[['company_name', 'lei', 'position_percent_x', 'latest_position_date_x']]
     changed_positions.columns = ['company_name', 'lei', 'position_percent', 'latest_position_date']
-    
-    
     
     # Should probably be changed to a more efficient way of doing this
     if not new_leis.empty:

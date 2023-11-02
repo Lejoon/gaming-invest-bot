@@ -33,7 +33,7 @@ async def gts(ctx):
 # Short seller command
 from fi_blankning import short_command    
 @bot.command()
-async def short(ctx, company_name):
+async def short(ctx, *, company_name):
     await short_command(ctx, db, company_name)
     
 # Earnings command

@@ -42,8 +42,7 @@ async def fetch_url(session, url):
         if 'text' in content_type or 'json' in content_type or 'xml' in content_type:
             # Here you might use response.charset or response.get_encoding()
             # if you expect different encodings
-            text = await response.text()
-            return await text(encoding=response.get_encoding() or 'ISO-8859-1') 
+            return await response.text()
             
         # If the content is a binary file or anything else, return as bytes
         else:

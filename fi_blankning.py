@@ -32,8 +32,22 @@ async def aiohttp_session():
 
 
 async def fetch_url(session, url):
-    async with session.get(url) as response:
-        return await response.text()
+    async with session.get(url) as response:  # type: ClientResponse
+        response.raise_for_status()  # Always good to check for HTTP errors
+        
+        # Check the content type header
+        content_type = response.headers.get('Content-Type', '')
+        
+        # If the content is HTML, XML, etc., decode it as text
+        if 'text' in content_type or 'json' in content_type or 'xml' in content_type:
+            # Here you might use response.charset or response.get_encoding()
+            # if you expect different encodings
+            text = await response.text()
+            return await text(encoding=response.get_encoding() or 'ISO-8859-1') 
+            
+        # If the content is a binary file or anything else, return as bytes
+        else:
+            return await response.read()
     
 def read_last_known_timestamp(file_path):
     try:

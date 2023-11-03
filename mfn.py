@@ -7,9 +7,11 @@ import asyncio
 from datetime import datetime, timedelta
 
 PRESS_RELEASES_CHANNEL = 1163373835886805013
+WEBSOCKET_URL = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="en"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
 
 async def fetch_mfn_updates(bot):
-    websocket_url = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="en"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
+    websocket_url = WEBSOCKET_URL
+    last_disconnect_time = None
     try:
         async with websockets.connect(websocket_url) as ws:
             print("WebSocket connection established.")
@@ -40,8 +42,12 @@ async def fetch_mfn_updates(bot):
                     await channel.send(embed=embed)
                     
     except Exception as e:
-        print(f"WebSocket Error: {e}")
-        return  # Connection closed or other error, return to allow reconnection attempt
+        current_time = datetime.now()
+
+        # The websocket automatically closes after 5 minutes of inactivity
+        if last_disconnect_time is None or (current_time - last_disconnect_time).total_seconds() > 330:
+            print(f"[ERR] WebSocket Error: {e}")
+        return 
 
 async def websocket_background_task(bot):
     attempt_count = 0
@@ -56,6 +62,8 @@ async def websocket_background_task(bot):
         # Calculate the wait time using exponential backoff
         attempt_count += 1
         wait_time = min(2 ** attempt_count, 60)  # Exponential backoff, capped at 60 seconds
-        print(f"Reconnecting in {wait_time} seconds...")
+        
+        if wait_time > 10:  # Only log if the wait time is more than 8 seconds to be less verbose
+            print(f"[LOG] Reconnecting websocket in {wait_time} seconds...")
         
         await asyncio.sleep(wait_time)  # Wait before retrying

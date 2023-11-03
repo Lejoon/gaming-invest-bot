@@ -89,7 +89,7 @@ def read_data(path):
     
     if 'company_name' in df.columns:
         df['company_name'] = df['company_name'].str.strip()
-    print(f'Df columns: {df.columns}')
+        
     return df
 
 
@@ -104,8 +104,6 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
     if not new_data.empty:
         new_data['timestamp'] = fetched_timestamp
         
-    print(f'New data columns: {new_data.columns}')
-    print(f'Old data columns: {old_data.columns}')
     old_data = old_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
     new_data = new_data.sort_values('timestamp').drop_duplicates(['lei', 'company_name'], keep='last')
     
@@ -122,7 +120,6 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
         new_leis.loc[:, 'timestamp'] = fetched_timestamp
     changed_positions['timestamp'] = fetched_timestamp
     new_rows = pd.concat([new_leis, changed_positions])
-    print('New rows:' + str(new_rows))
 
     # Insert new and updated records
     db.insert_bulk_data(input=new_rows, table='ShortPositions')

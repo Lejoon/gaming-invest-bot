@@ -61,42 +61,66 @@ async def send_to_discord(title, date, url, company, bot):
         print('Sent telegram item')
 
 async def fetch_page(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            return await response.text()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()  # Raise an error for bad responses like 404 or 500
+                return await response.text()
+            
+    except aiohttp.ClientError as e:
+        print(f"[ERR] Placera error occurred: {e}")
+    except aiohttp.http_exceptions.HttpProcessingError as e:
+        print(f"[ERR] Placera error occurred: {e}")
+    except Exception as e:
+        print(f"[ERR] Placera, an unexpected error occurred: {e}")
+    return None  
+
 
 async def check_for_placera_updates(bot):
     while True:
         await asyncio.sleep(30)
         url = 'https://www.placera.se/placera/telegram.html'
         page_content = await fetch_page(url)
-        soup = BeautifulSoup(page_content, 'html.parser')
+        
+        if page_content is None:
+            print("[ERR] Failed to retrieve Placera page content.")
+            return  # Skip this iteration or handle the case as needed
 
-        ul_list = soup.find('ul', {'class': 'feedArticleList XSText'})
+        try: 
+            soup = BeautifulSoup(page_content, 'html.parser')
 
-        for li in ul_list.find_all('li', {'class': 'item'}):
-            a_tag = li.find('a')
-            relative_url = a_tag['href']
-            full_url = f'http://www.placera.se{relative_url}'
-            
-            intro_div = a_tag.find('div', {'class': 'intro'})
-            company_span = intro_div.find('span', {'class': 'bold'})
-            
-            company = company_span.text.strip().rstrip(":") if company_span else None
-            title = intro_div.text.strip()
-            date = li.find('span', {'class': 'date'}).text.strip()
+            ul_list = soup.find('ul', {'class': 'feedArticleList XSText'})
 
-            article_id = date + title
+            if ul_list is None:
+                print("Could not find the required ul element. The Placera page structure might have changed.")
+                return
 
-            if article_id not in seen_articles:
-                for tracked_company in companies_to_track:
-                    if company and tracked_company.lower() in company.lower():
-                        print(f'Found news item regarding {company}')
-                        await send_to_discord(title, date, full_url, company, bot)
-                        break
+            for li in ul_list.find_all('li', {'class': 'item'}):
+                a_tag = li.find('a')
+                relative_url = a_tag['href']
+                full_url = f'http://www.placera.se{relative_url}'
                 
-                seen_articles.append(article_id)
-                save_seen_articles()
+                intro_div = a_tag.find('div', {'class': 'intro'})
+                company_span = intro_div.find('span', {'class': 'bold'})
+                
+                company = company_span.text.strip().rstrip(":") if company_span else None
+                title = intro_div.text.strip()
+                date = li.find('span', {'class': 'date'}).text.strip()
+
+                article_id = date + title
+
+                if article_id not in seen_articles:
+                    for tracked_company in companies_to_track:
+                        if company and tracked_company.lower() in company.lower():
+                            print(f'Found news item regarding {company}')
+                            await send_to_discord(title, date, full_url, company, bot)
+                            break
+                    
+                    seen_articles.append(article_id)
+                    save_seen_articles()
+    
+        except Exception as e:
+            print(f"An error occurred while parsing Placera: {e}")
 
 async def placera_updates(bot):
     await check_for_placera_updates(bot)

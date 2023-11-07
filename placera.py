@@ -79,7 +79,7 @@ async def fetch_page(url):
 async def check_for_placera_updates(bot):
     while True:
         await asyncio.sleep(30)
-        url = 'https://www.placera.se/placera/telegram.17.html'
+        url = 'https://www.placera.se/placera/telegram.html'
         page_content = await fetch_page(url)
         
         if page_content is None:

@@ -22,7 +22,7 @@ def get_icon_from_description(description):
     return key, description, None
 
 # List of companies to track (case insensitive)
-companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront']
+companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Flexion', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront']
 
 # Create a deque with a maximum size to store the recently seen articles
 max_queue_size = 100
@@ -79,7 +79,7 @@ async def fetch_page(url):
 async def check_for_placera_updates(bot):
     while True:
         await asyncio.sleep(30)
-        url = 'https://www.placera.se/placera/telegram.html'
+        url = 'https://www.placera.se/placera/telegram.17.html'
         page_content = await fetch_page(url)
         
         if page_content is None:

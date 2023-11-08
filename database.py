@@ -2,6 +2,42 @@
 import sqlite3
 from datetime import datetime, timedelta
 
+GAME_TRANSLATION_SCHEMA = '''
+        CREATE TABLE IF NOT EXISTS GameTranslation (
+            appid TEXT PRIMARY KEY,
+            game_name TEXT
+        );
+        '''
+STEAM_TOP_GAMES_SCHEMA = '''
+        CREATE TABLE IF NOT EXISTS SteamTopGames (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            place INTEGER,
+            appid TEXT,
+            discount TEXT,
+            ccu INTEGER
+        );
+        '''
+SHORT_POSITIONS_SCHEMA = '''    
+        CREATE TABLE IF NOT EXISTS ShortPositions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME,
+            company_name TEXT NOT NULL,
+            lei TEXT,
+            position_percent REAL,
+            latest_position_date TEXT
+        );
+        '''
+REPORTED_ENTITIES_SCHEMA = '''
+        CREATE TABLE IF NOT EXISTS ReportedEntities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_name TEXT NOT NULL,
+            issuer_name TEXT NOT NULL,
+            isin TEXT,
+            position_percent REAL,
+            position_date TEXT
+        );
+        '''
 class Database:
     def __enter__(self):
         return self
@@ -14,32 +50,10 @@ class Database:
         self.cursor = self.conn.cursor()
         
     def create_tables(self):
-        self.cursor.execute('''
-        CREATE TABLE IF NOT EXISTS GameTranslation (
-            appid TEXT PRIMARY KEY,
-            game_name TEXT
-        );
-        ''')
-        self.cursor.execute('''
-        CREATE TABLE IF NOT EXISTS SteamTopGames (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            place INTEGER,
-            appid TEXT,
-            discount TEXT,
-            ccu INTEGER
-        );
-        ''')
-        self.cursor.execute('''    
-        CREATE TABLE IF NOT EXISTS ShortPositions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp DATETIME,
-                company_name TEXT NOT NULL,
-                lei TEXT,
-                position_percent REAL,
-                latest_position_date TEXT
-        );
-        ''')
+        self.cursor.execute(GAME_TRANSLATION_SCHEMA)
+        self.cursor.execute(STEAM_TOP_GAMES_SCHEMA)
+        self.cursor.execute(SHORT_POSITIONS_SCHEMA)
+        self.cursor.execute(REPORTED_ENTITIES_SCHEMA)
         self.conn.commit()
         
     def get_latest_timestamp(self, table):
@@ -88,10 +102,10 @@ class Database:
             '''
             data = [(row['timestamp'],row['company_name'], row['lei'], row['position_percent'], row['latest_position_date']) for _, row in input.iterrows()]
 
-
         self.cursor.executemany(query, data)
         self.conn.commit()
-        
+    
+    # TODO: Not used currently
     def fetch_current_short_position(self, company_name):
         query = '''
                 SELECT * FROM ShortPositions
@@ -113,12 +127,13 @@ class Database:
             }
         else:
             return None   
-        
+    
+    # TODO: Not used currently    
     def fetch_historical_short_positions(self, company_name):
         query = '''
                 SELECT * FROM ShortPositions
                 WHERE TRIM(company_name) = ?
-                ORDER BY timestamp ASC;
+                ORDER BY timestamp DESC;
                 '''
         self.cursor.execute(query, (company_name.strip(),))
         results = self.cursor.fetchall()

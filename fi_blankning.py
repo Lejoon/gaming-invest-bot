@@ -187,10 +187,10 @@ async def is_timestamp_updated(session):
 async def update_fi_from_web(db, bot):
     while True:
         async with aiohttp_session() as session:
-            if not await is_timestamp_updated(session):
-                continue
+            web_timestamp = await is_timestamp_updated(session)
             
-            web_timestamp = is_timestamp_updated(session)
+            if not web_timestamp:
+                continue
             
             await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
             new_data = read_aggregate_data(FILE_PATHS['DATA_AGG'])

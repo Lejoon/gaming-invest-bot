@@ -11,11 +11,15 @@ from general_utils import retry_with_backoff
 
 # Constants
 URLS = {
-    'DATA': 'https://www.fi.se/sv/vara-register/blankningsregistret/GetBlankningsregisterAggregat/',
+    'DATA_AGG': 'https://www.fi.se/sv/vara-register/blankningsregistret/GetBlankningsregisterAggregat/',
+    'DATA_ACT': 'https://www.fi.se/sv/vara-register/blankningsregistret/GetAktuellFile/',
     'TIMESTAMP': 'https://www.fi.se/sv/vara-register/blankningsregistret/'
 
 }
-FILE_PATHS = {'DATA': 'Blankningsregisteraggregat.ods', 'TIMESTAMP': 'last_known_timestamp.txt'}
+
+FILE_PATHS = {'DATA_AGG': 'Blankningsregisteraggregat.ods',
+              'DATA_ACT': 'AktuellaPositioner.ods', 
+              'TIMESTAMP': 'last_known_timestamp.txt'}
 DELAY_TIME = 15*60
 CHANNEL_ID = 1167391973825593424
 TRACKED_COMPANIES = set([
@@ -30,21 +34,14 @@ async def aiohttp_session():
     async with ClientSession() as session:
         yield session
 
-
 async def fetch_url(session, url):
     async with session.get(url) as response:  # type: ClientResponse
-        response.raise_for_status()  # Always good to check for HTTP errors
-        
-        # Check the content type header
+        response.raise_for_status() # Raise an error for bad responses like 404 or 500
         content_type = response.headers.get('Content-Type', '')
         
-        # If the content is HTML, XML, etc., decode it as text
         if 'text' in content_type or 'json' in content_type or 'xml' in content_type:
-            # Here you might use response.charset or response.get_encoding()
-            # if you expect different encodings
             return await response.text()
             
-        # If the content is a binary file or anything else, return as bytes
         else:
             return await response.read()
     
@@ -71,11 +68,10 @@ async def download_file(session, url, path):
     with open(path, 'wb') as f:
         f.write(content)
         
-def read_data(path):
+def read_aggregate_data(path):
     df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
     os.remove(path)
     
-    # Rename columns by position: [0] -> 'company_name', [1] -> 'lei', etc.
     new_column_names = {
         df.columns[0]: 'company_name',
         df.columns[1]: 'lei',
@@ -83,21 +79,34 @@ def read_data(path):
         df.columns[3]: 'latest_position_date'
     }
     df.rename(columns=new_column_names, inplace=True)
-
-    # Only rename columns that exist in the DataFrame
-    new_column_names = {k: v for k, v in new_column_names.items() if k in df.columns}
     
     if 'company_name' in df.columns:
         df['company_name'] = df['company_name'].str.strip()
         
     return df
 
+def read_current_data(path):
+    df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
+    os.remove(path)
+    
+    new_column_names = {
+        df.columns[0]: 'entity_name',
+        df.columns[1]: 'issuer_name',
+        df.columns[2]: 'isin',
+        df.columns[3]: 'position_percent',
+        df.columns[4]: 'latest_position_date'
+    }
+    df.rename(columns=new_column_names, inplace=True)
+    
+    df['company_name'] = df['company_name'].str.strip()
+    df['issuer_name'] = df['issuer_name'].str.strip()
+        
+    return df
 
-# Function to update the database based on the differences between old and new data
 async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 
     if old_data.empty:
-        new_data['timestamp'] = fetched_timestamp  # Add the fetched timestamp
+        new_data['timestamp'] = fetched_timestamp
         db.insert_bulk_data(input=new_data, table='ShortPositions')
         return
     
@@ -157,27 +166,34 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 
                 if channel:
                     await channel.send(embed=embed)
+
+async def is_timestamp_updated(session):
+    last_known_timestamp = read_last_known_timestamp(FILE_PATHS['TIMESTAMP'])
+    web_timestamp = await fetch_last_update_time(session)
+    next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
+
+    if web_timestamp == last_known_timestamp:
+        print(f'[LOG] Web timestamp unchanged ({web_timestamp}). Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+        await asyncio.sleep(DELAY_TIME)
+        return False
+
+    last_known_timestamp = web_timestamp
+    write_last_known_timestamp(FILE_PATHS['TIMESTAMP'], web_timestamp)
+    
+    print(f'[LOG] New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+    return web_timestamp
                     
 # Main asynchronous loop to update the database at intervals
 async def update_fi_from_web(db, bot):
     while True:
         async with aiohttp_session() as session:
-            last_known_timestamp = read_last_known_timestamp(FILE_PATHS['TIMESTAMP'])
-            web_timestamp = await fetch_last_update_time(session)
-            next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
-
-            if web_timestamp == last_known_timestamp:
-                print(f'[LOG] Web timestamp unchanged ({web_timestamp}). Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
-                await asyncio.sleep(DELAY_TIME)
+            if not await is_timestamp_updated(session):
                 continue
-
-            last_known_timestamp = web_timestamp
-            write_last_known_timestamp(FILE_PATHS['TIMESTAMP'], web_timestamp)
             
-            print(f'[LOG] New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+            web_timestamp = is_timestamp_updated(session)
             
-            await download_file(session, URLS['DATA'], FILE_PATHS['DATA'])
-            new_data = read_data(FILE_PATHS['DATA'])
+            await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
+            new_data = read_aggregate_data(FILE_PATHS['DATA_AGG'])
 
             old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
             await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
@@ -188,8 +204,8 @@ async def update_fi_from_web(db, bot):
 
 async def manual_update(db):
     async with aiohttp_session() as session:
-        await download_file(session,URLS['DATA'], FILE_PATHS['DATA'])
-        new_data = read_data(FILE_PATHS['DATA'])
+        await download_file(session,URLS['DATA_AGG'], FILE_PATHS['DATA'])
+        new_data = read_aggregate_data(FILE_PATHS['DATA_AGG'])
         old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
 
         update_database_diff(old_data, new_data, db)

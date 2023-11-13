@@ -6,3 +6,4 @@ Blankningsregisteraggregat.ods
 tests/
 .DS_Store
 __pycache__/
+local_testing.py

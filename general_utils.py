@@ -21,7 +21,7 @@ def retry_with_backoff(retries=5, base_delay=1.0, max_delay=60.0):
                 try:
                     # Call the function and immediately return if successful
                     return await func(*args, **kwargs)
-                except aiohttp.ClientConnectorError as e:
+                except (aiohttp.ClientConnectorError, aiohttp.ClientResponseError) as e:
                     if attempt == retries - 1:  # If this was the last retry
                         raise  # Re-raise the last exception
                     else:

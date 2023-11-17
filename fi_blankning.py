@@ -219,7 +219,7 @@ async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
     
     # Define time intervals in the format "YYYY-MM-DD HH:MM"
-    now = datetime.datetime.now()
+    now = datetime.now()
     one_day_ago = (now - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
     one_week_ago = (now - datetime.timedelta(weeks=1)).strftime("%Y-%m-%d %H:%M")
 

@@ -240,11 +240,11 @@ async def short_command(ctx, db, company_name):
         one_week_change = None
 
         for data in results:
-            data_timestamp = datetime.datetime.strptime(data['timestamp'], "%Y-%m-%d %H:%M")
-            if data_timestamp <= datetime.datetime.strptime(one_day_ago, "%Y-%m-%d %H:%M") and one_day_change is None:
+            data_timestamp = datetime.strptime(data['timestamp'], "%Y-%m-%d %H:%M")
+            if data_timestamp <= datetime.strptime(one_day_ago, "%Y-%m-%d %H:%M") and one_day_change is None:
                 one_day_change = current_data['position_percent'] - data['position_percent']
 
-            if data_timestamp <= datetime.datetime.strptime(one_week_ago, "%Y-%m-%d %H:%M") and one_week_change is None:
+            if data_timestamp <= datetime.strptime(one_week_ago, "%Y-%m-%d %H:%M") and one_week_change is None:
                 one_week_change = current_data['position_percent'] - data['position_percent']
                 break  # Since we have both changes, we can break the loop
 

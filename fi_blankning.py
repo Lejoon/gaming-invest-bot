@@ -238,13 +238,27 @@ async def short_command(ctx, db, company_name):
 
         for data in results:
             data_timestamp = datetime.strptime(data[2], "%Y-%m-%d %H:%M")
-            
-            if data_timestamp <= one_day_ago and one_day_change is None:
-                one_day_change = current_data[1] - data[1]
 
-            if data_timestamp <= one_week_ago and one_week_change is None:
-                one_week_change = current_data[1] - data[1]
-                break
+            # Checking for one day change
+            if data_timestamp <= one_day_ago:
+                if one_day_change is None or data_timestamp > datetime.strptime(one_day_change[2], "%Y-%m-%d %H:%M"):
+                    one_day_change = data
+
+            # Checking for one week change
+            if data_timestamp <= one_week_ago:
+                if one_week_change is None or data_timestamp > datetime.strptime(one_week_change[2], "%Y-%m-%d %H:%M"):
+                    one_week_change = data
+
+        # Calculate the changes
+        if one_day_change:
+            one_day_change_value = current_data[1] - one_day_change[1]
+        else:
+            one_day_change_value = None
+
+        if one_week_change:
+            one_week_change_value = current_data[1] - one_week_change[1]
+        else:
+            one_week_change_value = None
 
         response = f"The latest short position for {current_data[0]} is {current_data[1]}% at {current_data[2]}."
         if one_day_change is not None:

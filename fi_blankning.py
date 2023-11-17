@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
+import datetime
 import asyncio
 import os
 import pandas as pd
@@ -240,16 +241,16 @@ async def short_command(ctx, db, company_name):
         one_week_change = None
 
         for data in results:
-            data_timestamp = datetime.strptime(data['timestamp'], "%Y-%m-%d %H:%M")
+            data_timestamp = datetime.strptime(data[2], "%Y-%m-%d %H:%M")
             if data_timestamp <= datetime.strptime(one_day_ago, "%Y-%m-%d %H:%M") and one_day_change is None:
-                one_day_change = current_data['position_percent'] - data['position_percent']
+                one_day_change = current_data[1] - data[1]
 
             if data_timestamp <= datetime.strptime(one_week_ago, "%Y-%m-%d %H:%M") and one_week_change is None:
-                one_week_change = current_data['position_percent'] - data['position_percent']
+                one_week_change = current_data[1] - data[1]
                 break  # Since we have both changes, we can break the loop
 
         # Create response message
-        response = f"The latest short position for {current_data['company_name']} is {current_data['position_percent']}% at {current_data['timestamp']}."
+        response = f"The latest short position for {current_data[0]} is {current_data[1]}% at {current_data[2]}."
         if one_day_change is not None:
             response += f"\n1-day change: {one_day_change:+.2f}%."
         if one_week_change is not None:

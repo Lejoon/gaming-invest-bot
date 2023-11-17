@@ -281,16 +281,19 @@ async def short_command(ctx, db, company_name):
 
     # Calculate changes and form response
     response = ""
-    if current_data:
-        response = f"The latest short position for {current_data[0]} is {current_data[1]}% at {current_data[2]}."
+    changes = []
 
+    if current_data:
         if result_yesterday:
             one_day_change_value = current_data[1] - result_yesterday[1]
-            response += f"\n1-day change: {one_day_change_value:+.2f}%."
+            changes.append(f"1D: {one_day_change_value:+.2f}%")
 
         if result_one_week_ago:
             one_week_change_value = current_data[1] - result_one_week_ago[1]
-            response += f"\n1-week change: {one_week_change_value:+.2f}%."
+            changes.append(f"1W: {one_week_change_value:+.2f}%")
+
+        changes_str = ', '.join(changes) if changes else "No recent changes"
+        response = f"The latest short position for {current_data[0]} is {current_data[1]}% ({changes_str}) with update at {current_data[2]}."
     else:
         response = f"No short position found for {company_name}."
 

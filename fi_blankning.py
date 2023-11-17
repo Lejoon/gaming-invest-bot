@@ -218,18 +218,44 @@ async def manual_update(db):
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
     
+    # Define time intervals in the format "YYYY-MM-DD HH:MM"
+    now = datetime.datetime.now()
+    one_day_ago = (now - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
+    one_week_ago = (now - datetime.timedelta(weeks=1)).strftime("%Y-%m-%d %H:%M")
+
+    # Modify the query to fetch historical data
     query = f"""
     SELECT company_name, position_percent, timestamp
     FROM ShortPositions
     WHERE LOWER(company_name) LIKE '%{company_name}%'
+    AND timestamp >= '{one_week_ago}'
     ORDER BY timestamp DESC
-    LIMIT 1
     """
-    result = db.cursor.execute(query).fetchone()
+    results = db.cursor.execute(query).fetchall()
 
-    if result:
-        db_company_name, position_percent, timestamp = result
-        await ctx.send(f"The latest short position for {db_company_name} is {position_percent}% at {timestamp}.")
+    # Process the results to calculate changes
+    if results:
+        current_data = results[0]
+        one_day_change = None
+        one_week_change = None
+
+        for data in results:
+            data_timestamp = datetime.datetime.strptime(data['timestamp'], "%Y-%m-%d %H:%M")
+            if data_timestamp <= datetime.datetime.strptime(one_day_ago, "%Y-%m-%d %H:%M") and one_day_change is None:
+                one_day_change = current_data['position_percent'] - data['position_percent']
+
+            if data_timestamp <= datetime.datetime.strptime(one_week_ago, "%Y-%m-%d %H:%M") and one_week_change is None:
+                one_week_change = current_data['position_percent'] - data['position_percent']
+                break  # Since we have both changes, we can break the loop
+
+        # Create response message
+        response = f"The latest short position for {current_data['company_name']} is {current_data['position_percent']}% at {current_data['timestamp']}."
+        if one_day_change is not None:
+            response += f"\n1-day change: {one_day_change:+.2f}%."
+        if one_week_change is not None:
+            response += f"\n1-week change: {one_week_change:+.2f}%."
+
+        await ctx.send(response)
     else:
         await ctx.send(f"No short position found for {company_name}.")
         

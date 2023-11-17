@@ -220,8 +220,8 @@ async def short_command(ctx, db, company_name):
     
     # Define time intervals in the format "YYYY-MM-DD HH:MM"
     now = datetime.now()
-    one_day_ago = (now - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
-    one_week_ago = (now - datetime.timedelta(weeks=1)).strftime("%Y-%m-%d %H:%M")
+    one_day_ago = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
+    one_week_ago = (now - timedelta(weeks=1)).strftime("%Y-%m-%d %H:%M")
 
     # Modify the query to fetch historical data
     query = f"""

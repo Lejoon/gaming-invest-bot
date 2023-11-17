@@ -25,7 +25,7 @@ def get_icon_from_description(description):
 companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Flexion', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront', 'Take-Two']
 
 # Create a deque with a maximum size to store the recently seen articles
-max_queue_size = 100
+max_queue_size = 1000
 
 def save_seen_articles():
     with open('seen_articles.pkl', 'wb') as f:
@@ -77,23 +77,25 @@ async def fetch_page(url):
 
 
 async def check_for_placera_updates(bot):
-    while True:
-        await asyncio.sleep(30)
-        url = 'https://www.placera.se/placera/telegram.html'
-        page_content = await fetch_page(url)
-        
-        if page_content is None:
-            print("[ERR] Failed to retrieve Placera page content.")
-            return  # Skip this iteration or handle the case as needed
+    delay = 60  # Initial delay in seconds
+    max_delay = 600  # Maximum delay in seconds (10 minutes)
 
-        try: 
+    while True:
+        try:
+            url = 'https://www.placera.se/placera/telegram.5.html'
+            page_content = await fetch_page(url)
+            
+            if page_content is None:
+                print("[ERR] Failed to retrieve Placera page content.")
+                raise Exception("Failed to retrieve content")
+
+        
             soup = BeautifulSoup(page_content, 'html.parser')
 
             ul_list = soup.find('ul', {'class': 'feedArticleList XSText'})
 
             if ul_list is None:
-                print("Could not find the required ul element. The Placera page structure might have changed.")
-                return
+                raise Exception("Could not find the required ul element. The Placera page structure might have changed.")
 
             for li in ul_list.find_all('li', {'class': 'item'}):
                 a_tag = li.find('a')
@@ -118,9 +120,15 @@ async def check_for_placera_updates(bot):
                     
                     seen_articles.append(article_id)
                     save_seen_articles()
+                
+                delay = 60  # Reset delay on success
     
         except Exception as e:
             print(f"An error occurred while parsing Placera: {e}")
+            delay = min(delay * 2, max_delay)  # Double the delay, up to a maximum
+
+        finally:
+            await asyncio.sleep(delay)  # Sleep for the current del
 
 async def placera_updates(bot):
     await check_for_placera_updates(bot)

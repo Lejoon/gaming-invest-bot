@@ -82,7 +82,7 @@ async def check_for_placera_updates(bot):
 
     while True:
         try:
-            url = 'https://www.placera.se/placera/telegram.5.html'
+            url = 'https://www.placera.se/placera/telegram.html'
             page_content = await fetch_page(url)
             
             if page_content is None:

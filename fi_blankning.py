@@ -21,7 +21,7 @@ FILE_PATHS = {'DATA_AGG': 'Blankningsregisteraggregat.ods',
               'DATA_ACT': 'AktuellaPositioner.ods', 
               'TIMESTAMP': 'last_known_timestamp.txt'}
 DELAY_TIME = 15*60
-CHANNEL_ID = 1167391973825593424
+CHANNEL_ID = 1175019650963222599
 TRACKED_COMPANIES = set([
     'Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB',
     'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive',

@@ -217,58 +217,84 @@ async def manual_update(db):
 # Command that returns the current short position for a given company name. It tries to match the company name at the best possible level, could be just partly or in another case. 
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
-    
-    now = datetime.now()
-    one_day_ago = (now - timedelta(days=1))
-    one_week_ago = (now - timedelta(weeks=1))
 
-    query = f"""
+    # Define time points
+    now = datetime.now()
+    yesterday = now - timedelta(days=1)
+    one_week_ago = now - timedelta(weeks=1)
+
+    # Query to get the last timestamp from yesterday
+    query_yesterday = f"""
     SELECT company_name, position_percent, timestamp
     FROM ShortPositions
     WHERE LOWER(company_name) LIKE '%{company_name}%'
-    AND timestamp >= '{one_week_ago.strftime("%Y-%m-%d %H:%M")}'
+    AND date(timestamp) = date('{yesterday.strftime("%Y-%m-%d")}')
     ORDER BY timestamp DESC
+    LIMIT 1
     """
-    results = db.cursor.execute(query).fetchall()
+    result_yesterday = db.cursor.execute(query_yesterday).fetchone()
 
-    if results:
-        current_data = results[0]
-        one_day_change = None
-        one_week_change = None
+    # If no result from yesterday, get the latest before yesterday
+    if not result_yesterday:
+        query_before_yesterday = f"""
+        SELECT company_name, position_percent, timestamp
+        FROM ShortPositions
+        WHERE LOWER(company_name) LIKE '%{company_name}%'
+        AND timestamp < '{yesterday.strftime("%Y-%m-%d")}'
+        ORDER BY timestamp DESC
+        LIMIT 1
+        """
+        result_yesterday = db.cursor.execute(query_before_yesterday).fetchone()
 
-        for data in results:
-            data_timestamp = datetime.strptime(data[2], "%Y-%m-%d %H:%M")
+    # Query to get the last timestamp from one week ago
+    query_one_week_ago = f"""
+    SELECT company_name, position_percent, timestamp
+    FROM ShortPositions
+    WHERE LOWER(company_name) LIKE '%{company_name}%'
+    AND date(timestamp) = date('{one_week_ago.strftime("%Y-%m-%d")}')
+    ORDER BY timestamp DESC
+    LIMIT 1
+    """
+    result_one_week_ago = db.cursor.execute(query_one_week_ago).fetchone()
 
-            # Checking for one day change
-            if data_timestamp <= one_day_ago:
-                if one_day_change is None or data_timestamp > datetime.strptime(one_day_change[2], "%Y-%m-%d %H:%M"):
-                    one_day_change = data
+    # If no result from one week ago, get the latest before one week ago
+    if not result_one_week_ago:
+        query_before_one_week_ago = f"""
+        SELECT company_name, position_percent, timestamp
+        FROM ShortPositions
+        WHERE LOWER(company_name) LIKE '%{company_name}%'
+        AND timestamp < '{one_week_ago.strftime("%Y-%m-%d")}'
+        ORDER BY timestamp DESC
+        LIMIT 1
+        """
+        result_one_week_ago = db.cursor.execute(query_before_one_week_ago).fetchone()
 
-            # Checking for one week change
-            if data_timestamp <= one_week_ago:
-                if one_week_change is None or data_timestamp > datetime.strptime(one_week_change[2], "%Y-%m-%d %H:%M"):
-                    one_week_change = data
+    # Get current data
+    current_query = f"""
+    SELECT company_name, position_percent, timestamp
+    FROM ShortPositions
+    WHERE LOWER(company_name) LIKE '%{company_name}%'
+    ORDER BY timestamp DESC
+    LIMIT 1
+    """
+    current_data = db.cursor.execute(current_query).fetchone()
 
-        # Calculate the changes
-        if one_day_change:
-            one_day_change_value = current_data[1] - one_day_change[1]
-        else:
-            one_day_change_value = None
-
-        if one_week_change:
-            one_week_change_value = current_data[1] - one_week_change[1]
-        else:
-            one_week_change_value = None
-
+    # Calculate changes and form response
+    response = ""
+    if current_data:
         response = f"The latest short position for {current_data[0]} is {current_data[1]}% at {current_data[2]}."
-        if one_day_change_value is not None:
-            response += f"\n1-day change: {one_day_change_value:+.2f}%."
-        if one_week_change_value is not None:
-            response += f"\n1-week change: {one_week_change_value:+.2f}%."
 
-        await ctx.send(response)
+        if result_yesterday:
+            one_day_change_value = current_data[1] - result_yesterday[1]
+            response += f"\n1-day change: {one_day_change_value:+.2f}%."
+
+        if result_one_week_ago:
+            one_week_change_value = current_data[1] - result_one_week_ago[1]
+            response += f"\n1-week change: {one_week_change_value:+.2f}%."
     else:
-        await ctx.send(f"No short position found for {company_name}.")
+        response = f"No short position found for {company_name}."
+
+    await ctx.send(response)
 
         
 # Entry point

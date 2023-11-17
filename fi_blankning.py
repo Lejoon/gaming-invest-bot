@@ -261,10 +261,10 @@ async def short_command(ctx, db, company_name):
             one_week_change_value = None
 
         response = f"The latest short position for {current_data[0]} is {current_data[1]}% at {current_data[2]}."
-        if one_day_change is not None:
-            response += f"\n1-day change: {one_day_change:+.2f}%."
-        if one_week_change is not None:
-            response += f"\n1-week change: {one_week_change:+.2f}%."
+        if one_day_change_value is not None:
+            response += f"\n1-day change: {one_day_change_value:+.2f}%."
+        if one_week_change_value is not None:
+            response += f"\n1-week change: {one_week_change_value:+.2f}%."
 
         await ctx.send(response)
     else:

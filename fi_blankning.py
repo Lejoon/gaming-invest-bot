@@ -218,22 +218,19 @@ async def manual_update(db):
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
     
-    # Define time intervals in the format "YYYY-MM-DD HH:MM"
     now = datetime.now()
-    one_day_ago = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
-    one_week_ago = (now - timedelta(weeks=1)).strftime("%Y-%m-%d %H:%M")
+    one_day_ago = (now - timedelta(days=1))
+    one_week_ago = (now - timedelta(weeks=1))
 
-    # Modify the query to fetch historical data
     query = f"""
     SELECT company_name, position_percent, timestamp
     FROM ShortPositions
     WHERE LOWER(company_name) LIKE '%{company_name}%'
-    AND timestamp >= '{one_week_ago}'
+    AND timestamp >= '{one_week_ago.strftime("%Y-%m-%d %H:%M")}'
     ORDER BY timestamp DESC
     """
     results = db.cursor.execute(query).fetchall()
 
-    # Process the results to calculate changes
     if results:
         current_data = results[0]
         one_day_change = None
@@ -241,14 +238,14 @@ async def short_command(ctx, db, company_name):
 
         for data in results:
             data_timestamp = datetime.strptime(data[2], "%Y-%m-%d %H:%M")
-            if data_timestamp <= datetime.strptime(one_day_ago, "%Y-%m-%d %H:%M") and one_day_change is None:
+            
+            if data_timestamp <= one_day_ago and one_day_change is None:
                 one_day_change = current_data[1] - data[1]
 
-            if data_timestamp <= datetime.strptime(one_week_ago, "%Y-%m-%d %H:%M") and one_week_change is None:
+            if data_timestamp <= one_week_ago and one_week_change is None:
                 one_week_change = current_data[1] - data[1]
-                break  # Since we have both changes, we can break the loop
+                break
 
-        # Create response message
         response = f"The latest short position for {current_data[0]} is {current_data[1]}% at {current_data[2]}."
         if one_day_change is not None:
             response += f"\n1-day change: {one_day_change:+.2f}%."
@@ -258,6 +255,7 @@ async def short_command(ctx, db, company_name):
         await ctx.send(response)
     else:
         await ctx.send(f"No short position found for {company_name}.")
+
         
 # Entry point
 if __name__ == "__main__":

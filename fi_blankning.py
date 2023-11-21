@@ -35,6 +35,7 @@ async def aiohttp_session():
         yield session
 
 async def fetch_url(session, url):
+    while True:
         try:
             async with session.get(url) as response:  # type: ClientResponse
                 response.raise_for_status() # Raise an error for bad responses like 404 or 500

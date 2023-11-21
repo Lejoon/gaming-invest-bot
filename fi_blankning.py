@@ -35,15 +35,19 @@ async def aiohttp_session():
         yield session
 
 async def fetch_url(session, url):
-    async with session.get(url) as response:  # type: ClientResponse
-        response.raise_for_status() # Raise an error for bad responses like 404 or 500
-        content_type = response.headers.get('Content-Type', '')
-        
-        if 'text' in content_type or 'json' in content_type or 'xml' in content_type:
-            return await response.text()
+        try:
+            async with session.get(url) as response:  # type: ClientResponse
+                response.raise_for_status() # Raise an error for bad responses like 404 or 500
+                content_type = response.headers.get('Content-Type', '')
+                
+                if 'text' in content_type or 'json' in content_type or 'xml' in content_type:
+                    return await response.text()
+                else:
+                    return await response.read()
+        except Exception as e:
+            print(f"Error occurred: {e}, retrying...")
+            await asyncio.sleep(30)  # wait for 1 second before retrying
             
-        else:
-            return await response.read()
     
 def read_last_known_timestamp(file_path):
     try:
@@ -170,6 +174,14 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 async def is_timestamp_updated(session):
     last_known_timestamp = read_last_known_timestamp(FILE_PATHS['TIMESTAMP'])
     web_timestamp = await fetch_last_update_time(session)
+    
+    # If it's of the form "0001-01-01 00:00" it means that the web timestamp is not available, fetch again with delay
+    while web_timestamp == "0001-01-01 00:00":
+        next_update_time = datetime.now() + timedelta(seconds=30)
+        print(f'[LOG] Web timestamp unavailable. Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+        await asyncio.sleep(30)
+        web_timestamp = await fetch_last_update_time(session)
+        
     next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
 
     if web_timestamp == last_known_timestamp:

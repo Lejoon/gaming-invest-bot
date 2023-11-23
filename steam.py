@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import os
 from database import Database
 import asyncio
+from general_utils import log_message, error_message
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
 
 async def fetch_ccu(appid):
@@ -135,7 +136,7 @@ async def daily_steam_database_refresh(db: Database):
     while True:
         log_time = datetime.now()
         log_time += timedelta(seconds=get_seconds_until(21,0))
-        print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to update database.')
+        log_message(f'Waiting until {log_time.strftime("%Y-%m-%d %H:%M")} to update Steam database.')
         await asyncio.sleep(get_seconds_until(21, 0))
         
 

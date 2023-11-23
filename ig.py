@@ -103,7 +103,7 @@ async def daily_message_morning(bot):
 async def daily_message_evening(bot):
     log_time = datetime.now()
     log_time += timedelta(seconds=get_seconds_until(21,59))
-    log_message(f'Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send evening  message.')
+    log_message(f'Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send evening message.')
     await send_daily_message(bot, 21, 59)
     
 async def current_index(ctx):

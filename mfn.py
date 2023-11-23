@@ -15,7 +15,7 @@ async def fetch_mfn_updates(bot):
     last_disconnect_time = None
     try:
         async with websockets.connect(websocket_url) as ws:
-            log_message(f'Connected to websocket {websocket_url}.')
+            log_message(f'Connected to websocket for MFN.')
             while True:
                 message = await ws.recv()
 

@@ -7,7 +7,7 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from discord import Embed
 from database import Database  # Assuming Database class is already defined
-from general_utils import aiohttp_retry
+from general_utils import aiohttp_retry, log_message, error_message
 
 # Constants
 URLS = {
@@ -172,21 +172,20 @@ async def is_timestamp_updated(session):
     # If it's of the form "0001-01-01 00:00" it means that the web timestamp is not available, fetch again with delay
     while web_timestamp == "0001-01-01 00:00":
         next_update_time = datetime.now() + timedelta(seconds=30)
-        print(f'[LOG] Web timestamp unavailable. Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+        log_message(f'Web timestamp unavailable. Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M")} to retry.')
         await asyncio.sleep(30)
         web_timestamp = await fetch_last_update_time(session)
         
     next_update_time = datetime.now() + timedelta(seconds=DELAY_TIME)
 
     if web_timestamp == last_known_timestamp:
-        print(f'[LOG] Web timestamp unchanged ({web_timestamp}). Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+        log_message(f'Web timestamp unchanged ({web_timestamp}). Waiting until {next_update_time.strftime("%Y-%m-%d %H:%M")}.')
         await asyncio.sleep(DELAY_TIME)
         return False
 
     last_known_timestamp = web_timestamp
     write_last_known_timestamp(FILE_PATHS['TIMESTAMP'], web_timestamp)
-    
-    print(f'[LOG] New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M:%S")}.')
+    log_message(f'New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M")}.')
     return web_timestamp
                     
 # Main asynchronous loop to update the database at intervals
@@ -204,7 +203,7 @@ async def update_fi_from_web(db, bot):
             old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
             await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
             
-            print('Database updated with new shorts if any.')
+            log_message('Database updated with new shorts if any.')
             await asyncio.sleep(DELAY_TIME)
 
 
@@ -216,7 +215,7 @@ async def manual_update(db):
 
         update_database_diff(old_data, new_data, db)
 
-        print('Database updated with new shorts if any.')
+        log_message('Manual update of database completed.')
 
 
 

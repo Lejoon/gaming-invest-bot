@@ -7,7 +7,7 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from discord import Embed
 from database import Database  # Assuming Database class is already defined
-from general_utils import retry_with_backoff
+from general_utils import aiohttp_retry
 
 # Constants
 URLS = {
@@ -34,21 +34,15 @@ async def aiohttp_session():
     async with ClientSession() as session:
         yield session
 
+@aiohttp_retry(retries=5, base_delay=5.0, max_delay=120.0)
 async def fetch_url(session, url):
-    while True:
-        try:
-            async with session.get(url) as response:  # type: ClientResponse
-                response.raise_for_status() # Raise an error for bad responses like 404 or 500
-                content_type = response.headers.get('Content-Type', '')
-                
-                if 'text' in content_type or 'json' in content_type or 'xml' in content_type:
-                    return await response.text()
-                else:
-                    return await response.read()
-        except Exception as e:
-            print(f"Error occurred: {e}, retrying...")
-            await asyncio.sleep(30)  # wait for 1 second before retrying
-            
+    async with session.get(url) as response:  # type: ClientResponse
+        response.raise_for_status() # Raise an error for bad responses like 404 or 500
+        content_type = response.headers.get('Content-Type', '')
+        if 'text' in content_type or 'json' in content_type or 'xml' in content_type:
+            return await response.text()
+        else:
+            return await response.read()            
     
 def read_last_known_timestamp(file_path):
     try:
@@ -61,7 +55,6 @@ def write_last_known_timestamp(file_path, timestamp):
     with open(file_path, 'w') as f:
         f.write(timestamp)
 
-@retry_with_backoff(retries=5, base_delay=5.0, max_delay=120.0)
 async def fetch_last_update_time(session):
     content = await fetch_url(session, URLS['TIMESTAMP'])
     soup = BeautifulSoup(content, 'html.parser')

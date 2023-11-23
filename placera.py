@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 import pickle
 import re
+from general_utils import log_message, error_message
 
 TELEGRAM_CHANNEL = 1167391973825593424
 icon_dict = {
@@ -17,7 +18,6 @@ def get_icon_from_description(description):
     for key in icon_dict:
         if key in description:
             description = re.sub(rf'\({key}\)', '', description).strip()
-            print(icon_dict[key])
             return key, description, icon_dict[key]
     return key, description, None
 
@@ -48,9 +48,7 @@ async def send_to_discord(title, date, url, company, bot):
     
     key, description, icon_url = get_icon_from_description(title)
         
-    timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")
-    print(timestamp)
-    
+    timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")    
     embed = discord.Embed(title=company, description=description, url=url, timestamp=timestamp)
     
     if icon_url:
@@ -58,7 +56,8 @@ async def send_to_discord(title, date, url, company, bot):
 
     if channel:
         await channel.send(embed=embed)
-        print('Sent telegram item')
+        # Current time
+        log_message(f'Sent Placera update about {title} to Discord.')
 
 async def fetch_page(url):
     try:
@@ -68,11 +67,7 @@ async def fetch_page(url):
                 return await response.text()
             
     except aiohttp.ClientError as e:
-        print(f"[ERR] Placera error occurred: {e}")
-    except aiohttp.http_exceptions.HttpProcessingError as e:
-        print(f"[ERR] Placera error occurred: {e}")
-    except Exception as e:
-        print(f"[ERR] Placera, an unexpected error occurred: {e}")
+        error_message(f'Placera error occurred: {e}')
     return None  
 
 
@@ -86,7 +81,6 @@ async def check_for_placera_updates(bot):
             page_content = await fetch_page(url)
             
             if page_content is None:
-                print("[ERR] Failed to retrieve Placera page content.")
                 raise Exception("Failed to retrieve content")
 
         
@@ -114,7 +108,7 @@ async def check_for_placera_updates(bot):
                 if article_id not in seen_articles:
                     for tracked_company in companies_to_track:
                         if company and tracked_company.lower() in company.lower():
-                            print(f'Found news item regarding {company}')
+                            log_message(f'Found news item regarding {company}')
                             await send_to_discord(title, date, full_url, company, bot)
                             break
                     
@@ -124,7 +118,7 @@ async def check_for_placera_updates(bot):
                 delay = 60  # Reset delay on success
     
         except Exception as e:
-            print(f"An error occurred while parsing Placera: {e}")
+            error_message(f'An error occurred while parsing Placera: {e}')
             delay = min(delay * 2, max_delay)  # Double the delay, up to a maximum
 
         finally:

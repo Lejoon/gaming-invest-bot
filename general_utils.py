@@ -3,6 +3,14 @@ import asyncio
 import random
 import aiohttp
 
+def log_message(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    print(f'[LOG] {timestamp} - {message}')
+    
+def error_message(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    print(f'[ERR] {timestamp} - {message}')
+
 def get_seconds_until(time_hour, time_minute):
     now = datetime.now()
     target_time = datetime(now.year, now.month, now.day, time_hour, time_minute)
@@ -13,15 +21,14 @@ def get_seconds_until(time_hour, time_minute):
         
     return int((target_time - now).total_seconds())
 
-def retry_with_backoff(retries=5, base_delay=1.0, max_delay=60.0):
+def aiohttp_retry(retries=5, base_delay=1.0, max_delay=60.0):
     def decorator(func):
         async def wrapper(*args, **kwargs):
             nonlocal retries, base_delay, max_delay
             for attempt in range(retries):
                 try:
-                    # Call the function and immediately return if successful
                     return await func(*args, **kwargs)
-                except (aiohttp.ClientConnectorError, aiohttp.ClientResponseError) as e:
+                except aiohttp.ClientError as e:
                     if attempt == retries - 1:  # If this was the last retry
                         raise  # Re-raise the last exception
                     else:

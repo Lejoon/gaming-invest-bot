@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from discord import Embed
+from general_utils import log_message, error_message
 import time
 
 CHANNEL_ID = 1161207966855348246
@@ -52,7 +53,7 @@ async def send_daily_message(bot, time_hour, time_minute):
         
         current_day = datetime.now().weekday()
         if current_day in [5, 6]:
-            print("It's the weekend. Skipping the daily message.")
+            log_message("It's the weekend. Skipping the daily message.")
             await asyncio.sleep(60 * 60)  # Sleep for 24 hours
             continue
         
@@ -75,7 +76,7 @@ async def send_daily_message(bot, time_hour, time_minute):
         channel = bot.get_channel(CHANNEL_ID)
         if channel:
             await channel.send(embed=embed)
-            print('Sent daily index')   
+            log_message(f'Sent daily index to Discord.')
 async def send_current_index(ctx):
     scraped_data = await get_scraped_data()
     embed = Embed(
@@ -91,18 +92,18 @@ async def send_current_index(ctx):
         embed.add_field(name=label, value=f"{data['Change Value']}%", inline=True)
     
     await ctx.send(embed=embed)
-    print('Sent current index')
+    log_message(f'Sent current index to Discord.')
 
 async def daily_message_morning(bot):
     log_time = datetime.now()
     log_time += timedelta(seconds=get_seconds_until(8,55))
-    print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send morning message.')
+    log_message(f'Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send morning message.')
     await send_daily_message(bot, 8, 55)
 
 async def daily_message_evening(bot):
     log_time = datetime.now()
     log_time += timedelta(seconds=get_seconds_until(21,59))
-    print(f'[LOG] Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send evening message.')
+    log_message(f'Waiting until {log_time.strftime("%Y-%m-%d %H:%M:%S")} to send evening  message.')
     await send_daily_message(bot, 21, 59)
     
 async def current_index(ctx):

@@ -15,7 +15,9 @@ async def fetch_mfn_updates(bot):
     last_disconnect_time = None
     try:
         async with websockets.connect(websocket_url) as ws:
-            log_message(f'Connected to websocket for MFN.')
+            if last_disconnect_time is None:
+                log_message(f'Connected to websocket for MFN.')
+
             while True:
                 message = await ws.recv()
 
@@ -46,7 +48,7 @@ async def fetch_mfn_updates(bot):
         current_time = datetime.now()
 
         # The websocket automatically closes after 5 minutes of inactivity
-        if last_disconnect_time is None or (current_time - last_disconnect_time).total_seconds() > 500:
+        if last_disconnect_time is None or (current_time - last_disconnect_time).total_seconds() > 360 + 10:
             error_message(f"Websocket error {e}.")
         return 
 

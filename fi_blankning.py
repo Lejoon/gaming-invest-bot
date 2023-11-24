@@ -218,77 +218,51 @@ async def manual_update(db):
         log_message('Manual update of database completed.')
 
 
+async def execute_query(db, query):
+    return db.cursor.execute(query).fetchone()
 
-# Command that returns the current short position for a given company name. It tries to match the company name at the best possible level, could be just partly or in another case. 
+def create_query(company_name, date, is_exact_date=True):
+    date_condition = f"date(timestamp) = date('{date}')" if is_exact_date else f"timestamp < '{date}'"
+    return f"""
+        SELECT company_name, position_percent, timestamp
+        FROM ShortPositions
+        WHERE LOWER(company_name) LIKE '%{company_name}%'
+        AND {date_condition}
+        ORDER BY timestamp DESC
+        LIMIT 1
+        """
+
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
+    now = datetime.now()
 
     # Define time points
-    now = datetime.now()
-    yesterday = now - timedelta(days=1)
-    one_week_ago = now - timedelta(weeks=1)
+    time_points = {
+        'yesterday': now - timedelta(days=1),
+        'one_week_ago': now - timedelta(weeks=1)
+    }
 
-    # Query to get the last timestamp from yesterday
-    query_yesterday = f"""
-    SELECT company_name, position_percent, timestamp
-    FROM ShortPositions
-    WHERE LOWER(company_name) LIKE '%{company_name}%'
-    AND date(timestamp) = date('{yesterday.strftime("%Y-%m-%d")}')
-    ORDER BY timestamp DESC
-    LIMIT 1
-    """
-    result_yesterday = db.cursor.execute(query_yesterday).fetchone()
-
-    # If no result from yesterday, get the latest before yesterday
-    if not result_yesterday:
-        query_before_yesterday = f"""
-        SELECT company_name, position_percent, timestamp
-        FROM ShortPositions
-        WHERE LOWER(company_name) LIKE '%{company_name}%'
-        AND timestamp < '{yesterday.strftime("%Y-%m-%d")}'
-        ORDER BY timestamp DESC
-        LIMIT 1
-        """
-        result_yesterday = db.cursor.execute(query_before_yesterday).fetchone()
-
-    # Query to get the last timestamp from one week ago
-    query_one_week_ago = f"""
-    SELECT company_name, position_percent, timestamp
-    FROM ShortPositions
-    WHERE LOWER(company_name) LIKE '%{company_name}%'
-    AND date(timestamp) = date('{one_week_ago.strftime("%Y-%m-%d")}')
-    ORDER BY timestamp DESC
-    LIMIT 1
-    """
-    result_one_week_ago = db.cursor.execute(query_one_week_ago).fetchone()
-
-    # If no result from one week ago, get the latest before one week ago
-    if not result_one_week_ago:
-        query_before_one_week_ago = f"""
-        SELECT company_name, position_percent, timestamp
-        FROM ShortPositions
-        WHERE LOWER(company_name) LIKE '%{company_name}%'
-        AND timestamp < '{one_week_ago.strftime("%Y-%m-%d")}'
-        ORDER BY timestamp DESC
-        LIMIT 1
-        """
-        result_one_week_ago = db.cursor.execute(query_before_one_week_ago).fetchone()
+    results = {}
+    for key, time_point in time_points.items():
+        query = create_query(company_name, time_point.strftime("%Y-%m-%d"))
+        result = await execute_query(db, query)
+        if not result:  # If no exact date match, query for the latest before the date
+            query = create_query(company_name, time_point.strftime("%Y-%m-%d"), is_exact_date=False)
+            result = await execute_query(db, query)
+        results[key] = result
 
     # Get current data
-    current_query = f"""
-    SELECT company_name, position_percent, timestamp
-    FROM ShortPositions
-    WHERE LOWER(company_name) LIKE '%{company_name}%'
-    ORDER BY timestamp DESC
-    LIMIT 1
-    """
-    current_data = db.cursor.execute(current_query).fetchone()
+    current_query = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
+    current_data = await execute_query(db, current_query)
 
     # Calculate changes and form response
     response = ""
     changes = []
 
     if current_data:
+        result_yesterday = results.get('yesterday')
+        result_one_week_ago = results.get('one_week_ago')
+
         if result_yesterday:
             one_day_change_value = current_data[1] - result_yesterday[1]
             changes.append(f"1D: {one_day_change_value:+.2f}%")

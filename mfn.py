@@ -21,10 +21,8 @@ async def fetch_mfn_updates(bot):
             while True:
                 message = await ws.recv()
 
-                # Parse the HTML content
                 soup = BeautifulSoup(message, 'html.parser')
                 
-                # Extract the required information
                 date = soup.find("span", class_="compressed-date").text
                 time = soup.find("span", class_="compressed-time").text
                 time = time[:-3]
@@ -33,12 +31,8 @@ async def fetch_mfn_updates(bot):
                 title = soup.find("a", class_="title-link item-link").text
                 title_url = "http://www.mfn.se"+soup.find("a", class_="title-link item-link")['href']
                 log_message(f'Fetched news {title} from MFN')
-                # Create an embedded message
     
                 embed = discord.Embed(title=author, url=title_url, description=title, color=0x00ff00, timestamp=datetime.strptime(date+" "+time, "%Y-%m-%d %H:%M"))
-                #embed = discord.Embed(title=title, url=title_url, description=f"Author: [{author}]({author_url})\nDate: {date}\nTime: {time}", color=0x00ff00)
-
-                # Fetch a Discord channel by its ID (replace 'your_channel_id_here' with the actual channel ID)
 
                 channel = bot.get_channel(PRESS_RELEASES_CHANNEL)
                 if channel:

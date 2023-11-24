@@ -66,7 +66,7 @@ async def download_file(session, url, path):
     with open(path, 'wb') as f:
         f.write(content)
         
-def read_aggregate_data(path):
+async def read_aggregate_data(path):
     df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
     os.remove(path)
     
@@ -83,7 +83,7 @@ def read_aggregate_data(path):
         
     return df
 
-def read_current_data(path):
+async def read_current_data(path):
     df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
     os.remove(path)
     

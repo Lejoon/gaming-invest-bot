@@ -44,6 +44,7 @@ async def fetch_mfn_updates(bot):
         # The websocket automatically closes after 5 minutes of inactivity
         if last_disconnect_time is None or (current_time - last_disconnect_time).total_seconds() > 360 + 10:
             error_message(f"Websocket error {e}.")
+        last_disconnect_time = datetime.now()
         return 
 
 async def websocket_background_task(bot):

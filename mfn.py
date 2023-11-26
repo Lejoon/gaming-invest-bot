@@ -10,9 +10,8 @@ from general_utils import log_message, error_message
 PRESS_RELEASES_CHANNEL = 1163373835886805013
 WEBSOCKET_URL = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="en"))(or(a.list_id=35207)(a.list_id=35208)(a.list_id=35209)(a.list_id=919325)(a.list_id=35198)(a.list_id=29934)(a.list_id=5700306)(a.list_id=4680265))(or(a.industry_id=36)))'
 
-async def fetch_mfn_updates(bot):
+async def fetch_mfn_updates(bot, last_disconnect_time):
     websocket_url = WEBSOCKET_URL
-    last_disconnect_time = None
     try:
         async with websockets.connect(websocket_url) as ws:
             if last_disconnect_time is None:
@@ -47,13 +46,16 @@ async def fetch_mfn_updates(bot):
         if last_disconnect_time is None or (current_time - last_disconnect_time).total_seconds() > 360 + 10:
             error_message(f"Websocket error {e}.")
         last_disconnect_time = datetime.now()
-        return 
+    return last_disconnect_time
+
 
 async def websocket_background_task(bot):
-    attempt_count = 0
+    attempt_count = 
+    last_disconnect_time = None
+
     while True:
         try:
-            await fetch_mfn_updates(bot)
+            last_disconnect_time = await fetch_mfn_updates(bot, last_disconnect_time)
             attempt_count = 0  # Reset the attempt count if successfully connected
         except Exception as e:
             error_message(f"Failed to connect to websocket {e}.")

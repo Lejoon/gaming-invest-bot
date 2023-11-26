@@ -38,6 +38,8 @@ async def fetch_mfn_updates(bot):
                 if channel:
                     await channel.send(embed=embed)
                     
+    except websockets.exceptions.ConnectionClosedError:
+        last_disconnect_time = datetime.now()
     except Exception as e:
         current_time = datetime.now()
 

@@ -198,7 +198,7 @@ async def update_fi_from_web(db, bot):
                 continue
             
             await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
-            new_data = read_aggregate_data(FILE_PATHS['DATA_AGG'])
+            new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
 
             old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
             await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
@@ -210,7 +210,7 @@ async def update_fi_from_web(db, bot):
 async def manual_update(db):
     async with aiohttp_session() as session:
         await download_file(session,URLS['DATA_AGG'], FILE_PATHS['DATA'])
-        new_data = read_aggregate_data(FILE_PATHS['DATA_AGG'])
+        new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
         old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
 
         update_database_diff(old_data, new_data, db)

@@ -21,7 +21,7 @@ def get_seconds_until(time_hour, time_minute):
         
     return int((target_time - now).total_seconds())
 
-def aiohttp_retry(retries=5, base_delay=1.0, max_delay=60.0):
+def aiohttp_retry(retries=5, base_delay=15.0, max_delay=120.0):
     def decorator(func):
         async def wrapper(*args, **kwargs):
             nonlocal retries, base_delay, max_delay

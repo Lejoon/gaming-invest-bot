@@ -50,7 +50,7 @@ async def fetch_mfn_updates(bot, last_disconnect_time):
 
 
 async def websocket_background_task(bot):
-    attempt_count = 
+    attempt_count = 0
     last_disconnect_time = None
 
     while True:

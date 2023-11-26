@@ -6,9 +6,10 @@ from bs4 import BeautifulSoup
 import os
 from database import Database
 import asyncio
-from general_utils import log_message, error_message
+from general_utils import log_message, error_message, aiohttp_retry
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
 
+@aiohttp_retry()
 async def fetch_ccu(appid):
     url = f"http://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?key={STEAM_API_KEY}&appid={appid}"
     async with aiohttp.ClientSession() as session:

@@ -28,7 +28,7 @@ def aiohttp_retry(retries=5, base_delay=15.0, max_delay=120.0):
             for attempt in range(retries):
                 try:
                     return await func(*args, **kwargs)
-                except aiohttp.ClientError as e:
+                except (aiohttp.ClientError, aiohttp.ClientConnectorError, aiohttp.ClientConnectionError) as e:
                     if attempt == retries - 1:  # If this was the last retry
                         raise  # Re-raise the last exception
                     else:

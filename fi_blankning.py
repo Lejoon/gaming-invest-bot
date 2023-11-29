@@ -226,14 +226,22 @@ def create_query(company_name, date, is_exact_date=True):
     if not is_exact_date:
         date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ? AND timestamp < ?)"
 
-    return (f"""
+    query = f"""
         SELECT company_name, position_percent, timestamp
         FROM ShortPositions
         WHERE LOWER(company_name) LIKE ?
         AND {date_condition}
         ORDER BY timestamp DESC
         LIMIT 1
-        """, ('%' + company_name + '%', date))
+        """
+
+    params = ('%' + company_name + '%',)
+    if is_exact_date:
+        params += ('%' + company_name + '%',)
+    else:
+        params += (date,)
+
+    return query, params
 
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()

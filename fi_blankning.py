@@ -219,7 +219,7 @@ async def manual_update(db):
 
 
 async def execute_query(db, query, params):
-    return db.cursor.execute(query).fetchone()
+    return db.cursor.execute(query, params).fetchone()
 
 def create_query(company_name, date, is_exact_date=True):
     date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ?)"
@@ -248,6 +248,7 @@ async def short_command(ctx, db, company_name):
     results = {}
     for key, time_point in time_points.items():
         query, params = create_query(company_name, time_point.strftime("%Y-%m-%d"))
+        print(query, params)
         result = await execute_query(db, query, params)
         if not result:  # If no exact date match, query for the latest before the date
             query, params = create_query(company_name, time_point.strftime("%Y-%m-%d"), is_exact_date=False)
@@ -257,10 +258,13 @@ async def short_command(ctx, db, company_name):
     # Get current data
     
     current_query, params = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
+    print(current_query, params)
     current_data = await execute_query(db, current_query, params)
     
     if not result:
         current_query, params = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
+        print(current_query, params)
+
         current_data = await execute_query(db, current_query, params)
     log_message(current_data)
 

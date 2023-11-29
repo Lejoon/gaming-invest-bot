@@ -253,7 +253,10 @@ async def short_command(ctx, db, company_name):
 
     # Get current data
     current_query, params = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
+    log_message(current_query)
+    log_message(params)
     current_data = await execute_query(db, current_query, params)
+    log_message(current_data)
 
     # Calculate changes and form response
     response = ""

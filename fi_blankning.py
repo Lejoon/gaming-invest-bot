@@ -218,28 +218,23 @@ async def manual_update(db):
         log_message('Manual update of database completed.')
 
 
-async def execute_query(db, query, params):
-    return db.cursor.execute(query, params).fetchone()
+async def execute_query(db, query):
+    return db.cursor.execute(query).fetchone()
 
 def create_query(company_name, date, is_exact_date=True):
     if is_exact_date:
-        date_condition = "timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ?)"
-        params = ('%' + company_name + '%', '%' + company_name + '%')
+        date_condition = f"date(timestamp) = date('{date}')"
     else:
-        date_condition = "timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ? AND timestamp < ?)"
-        params = ('%' + company_name + '%', '%' + company_name + '%', date)
+        date_condition = f"date(timestamp) <= date('{date}')"
 
-    query = f"""
+    return f"""
         SELECT company_name, position_percent, timestamp
         FROM ShortPositions
-        WHERE LOWER(company_name) LIKE ?
+        WHERE LOWER(company_name) LIKE '%{company_name}%'
         AND {date_condition}
         ORDER BY timestamp DESC
         LIMIT 1
         """
-
-    return query, params
-
 
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
@@ -253,26 +248,16 @@ async def short_command(ctx, db, company_name):
 
     results = {}
     for key, time_point in time_points.items():
-        query, params = create_query(company_name, time_point.strftime("%Y-%m-%d"))
-        print(query, params)
-        result = await execute_query(db, query, params)
+        query = create_query(company_name, time_point.strftime("%Y-%m-%d"))
+        result = await execute_query(db, query)
         if not result:  # If no exact date match, query for the latest before the date
-            query, params = create_query(company_name, time_point.strftime("%Y-%m-%d"), is_exact_date=False)
-            result = await execute_query(db, query, params)
+            query = create_query(company_name, time_point.strftime("%Y-%m-%d"), is_exact_date=False)
+            result = await execute_query(db, query)
         results[key] = result
 
     # Get current data
-    
-    current_query, params = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
-    print(current_query, params)
-    current_data = await execute_query(db, current_query, params)
-    
-    if not result:
-        current_query, params = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
-        print(current_query, params)
-
-        current_data = await execute_query(db, current_query, params)
-    log_message(current_data)
+    current_query = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
+    current_data = await execute_query(db, current_query)
 
     # Calculate changes and form response
     response = ""

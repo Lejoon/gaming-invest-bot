@@ -219,7 +219,7 @@ async def manual_update(db):
 
 
 async def execute_query(db, query, params):
-    return db.cursor.execute(query, params).fetchone()
+    return db.cursor.execute(query).fetchone()
 
 def create_query(company_name, date, is_exact_date=True):
     date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ?)"

@@ -222,9 +222,12 @@ async def execute_query(db, query, params):
     return db.cursor.execute(query, params).fetchone()
 
 def create_query(company_name, date, is_exact_date=True):
-    date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ?)"
-    if not is_exact_date:
-        date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ? AND timestamp < ?)"
+    if is_exact_date:
+        date_condition = "timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ?)"
+        params = ('%' + company_name + '%', '%' + company_name + '%')
+    else:
+        date_condition = "timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ? AND timestamp < ?)"
+        params = ('%' + company_name + '%', '%' + company_name + '%', date)
 
     query = f"""
         SELECT company_name, position_percent, timestamp
@@ -235,13 +238,8 @@ def create_query(company_name, date, is_exact_date=True):
         LIMIT 1
         """
 
-    params = ('%' + company_name + '%',)
-    if is_exact_date:
-        params += ('%' + company_name + '%',)
-    else:
-        params += (date,)
-
     return query, params
+
 
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()

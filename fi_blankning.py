@@ -222,7 +222,10 @@ async def execute_query(db, query, params):
     return db.cursor.execute(query, params).fetchone()
 
 def create_query(company_name, date, is_exact_date=True):
-    date_condition = f"date(timestamp) = date(?)" if is_exact_date else f"timestamp < ?"
+    date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE date(timestamp) = date(?))"
+    if not is_exact_date:
+        date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE timestamp < ?)"
+
     return (f"""
         SELECT company_name, position_percent, timestamp
         FROM ShortPositions

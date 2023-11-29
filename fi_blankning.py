@@ -222,9 +222,9 @@ async def execute_query(db, query, params):
     return db.cursor.execute(query, params).fetchone()
 
 def create_query(company_name, date, is_exact_date=True):
-    date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE date(timestamp) = date(?))"
+    date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ?)"
     if not is_exact_date:
-        date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE timestamp < ?)"
+        date_condition = f"timestamp = (SELECT MAX(timestamp) FROM ShortPositions WHERE LOWER(company_name) LIKE ? AND timestamp < ?)"
 
     return (f"""
         SELECT company_name, position_percent, timestamp
@@ -255,10 +255,13 @@ async def short_command(ctx, db, company_name):
         results[key] = result
 
     # Get current data
+    
     current_query, params = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
-    log_message(current_query)
-    log_message(params)
     current_data = await execute_query(db, current_query, params)
+    
+    if not result:
+        current_query, params = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
+        current_data = await execute_query(db, current_query, params)
     log_message(current_data)
 
     # Calculate changes and form response

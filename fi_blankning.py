@@ -291,7 +291,7 @@ async def create_timeseries(db, company_name):
     query = f"""
         SELECT timestamp, position_percent
         FROM ShortPositions
-        WHERE company_name = '{company_name}'
+        WHERE company_name LIKE '%{company_name}%'
         AND timestamp >= '{thirty_days_ago.strftime("%Y-%m-%d %H:%M")}'
         AND timestamp <= '{now.strftime("%Y-%m-%d %H:%M")}'
         ORDER BY timestamp

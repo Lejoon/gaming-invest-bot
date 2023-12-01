@@ -195,7 +195,7 @@ async def plot_timeseries(daily_data, company_name):
    # Load the Roboto font
     #roboto_font = fm.FontProperties(fname='/System/Library/Fonts/Supplemental/Arial.ttf')
 
-    fig, ax = plt.subplots(figsize=(2.5, 1.5))  # Adjust figure size to 50%
+    fig, ax = plt.subplots(figsize=(1.5, 0.5))  # Adjust figure size to 50%
     
     # Set figure background color
     fig.patch.set_facecolor('#36393F')  # Discord dark mode background color
@@ -225,7 +225,7 @@ async def plot_timeseries(daily_data, company_name):
 
     # Save the figure to a BytesIO object
     image_stream = io.BytesIO()
-    plt.savefig(image_stream, format='png', dpi=160, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
+    plt.savefig(image_stream, format='png', dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
     image_stream.seek(0)  # Go back to the start of the BytesIO object
 
     plt.close(fig)  # Close the figure to free up memory
@@ -297,7 +297,6 @@ async def create_timeseries(db, company_name):
         ORDER BY timestamp
         """
     data = pd.read_sql_query(query, db.conn)
-    print(data)
 
     # Convert the timestamp column to datetime
     data['timestamp'] = pd.to_datetime(data['timestamp'])

@@ -327,7 +327,8 @@ async def short_command(ctx, db, company_name):
     
     # If the company name is not found in the database, return None to indicate that the company is not tracked
     if not await execute_query(db, query):
-        ctx.send(f'Kan inte hitta någon blankning för {company_name}.')
+        await ctx.send(f'Kan inte hitta någon blankning för {company_name}.')
+        return None
     else:
         company_name = (await execute_query(db, query))[0]
 

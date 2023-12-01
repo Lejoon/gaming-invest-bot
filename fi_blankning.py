@@ -195,7 +195,7 @@ async def plot_timeseries(daily_data, company_name):
    # Load the Roboto font
     #roboto_font = fm.FontProperties(fname='/System/Library/Fonts/Supplemental/Arial.ttf')
 
-    fig, ax = plt.subplots(figsize=(2.5, 1.5))  # Adjust figure size to 50%
+    fig, ax = plt.subplots(figsize=(2.0, 1.0))  # Adjust figure size to 50%
     
     # Set figure background color
     fig.patch.set_facecolor('#36393F')  # Discord dark mode background color
@@ -225,7 +225,7 @@ async def plot_timeseries(daily_data, company_name):
 
     # Save the figure to a BytesIO object
     image_stream = io.BytesIO()
-    plt.savefig(image_stream, format='png', dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
+    plt.savefig(image_stream, format='png', dpi=190, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
     image_stream.seek(0)  # Go back to the start of the BytesIO object
 
     plt.close(fig)  # Close the figure to free up memory
@@ -319,7 +319,7 @@ async def short_command(ctx, db, company_name):
     now = datetime.now()
 
     daily_data = await create_timeseries(db, company_name)
-    image_stream = await plot_timeseries(daily_data, 'Embracer Group AB')
+    image_stream = await plot_timeseries(daily_data, company_name)
 
     await ctx.send(file=discord.File(image_stream, filename='plot.png'))
 

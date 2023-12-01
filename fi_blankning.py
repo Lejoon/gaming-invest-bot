@@ -195,7 +195,7 @@ async def plot_timeseries(daily_data, company_name):
    # Load the Roboto font
     #roboto_font = fm.FontProperties(fname='/System/Library/Fonts/Supplemental/Arial.ttf')
 
-    fig, ax = plt.subplots(figsize=(2.0, 1.0))  # Adjust figure size to 50%
+    fig, ax = plt.subplots(figsize=(2.5, 1.5))  # Adjust figure size to 50%
     
     # Set figure background color
     fig.patch.set_facecolor('#36393F')  # Discord dark mode background color
@@ -225,7 +225,7 @@ async def plot_timeseries(daily_data, company_name):
 
     # Save the figure to a BytesIO object
     image_stream = io.BytesIO()
-    plt.savefig(image_stream, format='png', dpi=190, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
+    plt.savefig(image_stream, format='png', dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
     image_stream.seek(0)  # Go back to the start of the BytesIO object
 
     plt.close(fig)  # Close the figure to free up memory
@@ -317,6 +317,20 @@ import discord
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
     now = datetime.now()
+    
+    query = f"""
+        SELECT company_name
+        FROM ShortPositions
+        WHERE company_name LIKE '%{company_name}%'
+        LIMIT 1
+        """
+    
+    # If the company name is not found in the database, return None to indicate that the company is not tracked
+    if not await execute_query(db, query):
+        ctx.send(f'Kan inte hitta någon blankning för {company_name}.')
+    else:
+        company_name = (await execute_query(db, query))[0]
+
 
     daily_data = await create_timeseries(db, company_name)
     image_stream = await plot_timeseries(daily_data, company_name)

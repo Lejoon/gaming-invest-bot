@@ -319,6 +319,7 @@ async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
     now = datetime.now()
 
+    daily_data = create_timeseries(db, company_name)
     image_stream = plot_timeseries(daily_data, 'Embracer Group AB')
 
     await ctx.send(file=discord.File(image_stream, filename='plot.png'))

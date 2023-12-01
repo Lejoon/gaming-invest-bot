@@ -8,6 +8,9 @@ from bs4 import BeautifulSoup
 from discord import Embed
 from database import Database  # Assuming Database class is already defined
 from general_utils import aiohttp_retry, log_message, error_message
+import matplotlib.pyplot as plt
+import io
+
 
 # Constants
 URLS = {
@@ -187,7 +190,48 @@ async def is_timestamp_updated(session):
     write_last_known_timestamp(FILE_PATHS['TIMESTAMP'], web_timestamp)
     log_message(f'New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M")}.')
     return web_timestamp
-                    
+          
+async def plot_timeseries(daily_data, company_name):
+   # Load the Roboto font
+    #roboto_font = fm.FontProperties(fname='/System/Library/Fonts/Supplemental/Arial.ttf')
+
+    fig, ax = plt.subplots(figsize=(2.5, 1.5))  # Adjust figure size to 50%
+    
+    # Set figure background color
+    fig.patch.set_facecolor('#36393F')  # Discord dark mode background color
+
+
+    ax.plot(daily_data.index, daily_data['position_percent'], linewidth=1, color='#1DA1F2')
+    # Remove axes
+    ax.axis('off')
+
+    # Add title with company name
+    ax.text(daily_data.index[0], daily_data['position_percent'].max() + 0.2, company_name, fontsize=8, ha='left',color='white')
+
+    # Calculate the change over 1 day and 1 week
+    change_1d = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-2]
+    change_1w = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-7]
+    change_1m = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-30]
+    # Add the change text under the title
+    ax.text(daily_data.index[0], daily_data['position_percent'].max() +0.05, f'1D ({change_1d:.2f}) 1W ({change_1w:.2f}) 1M ({change_1m:.2f})', fontsize=6, ha='left',color='white')
+
+    # Label the first and last timestamp with the position percent
+    first_timestamp, last_timestamp = daily_data.index[0], daily_data.index[-1]
+    first_value, last_value = daily_data.iloc[0, 0], daily_data.iloc[-1, 0]
+    ax.text(first_timestamp, first_value, f'{first_value:.2f}', ha='right',  fontsize=6, bbox=dict(facecolor='#36393F', edgecolor='none', pad=1), color='white')
+    ax.text(last_timestamp, last_value, f'{last_value:.2f}', ha='left',  fontsize=6, bbox=dict(facecolor='#36393F', edgecolor='none', pad=1), color='white')
+
+    plt.tight_layout()
+
+    # Save the figure to a BytesIO object
+    image_stream = io.BytesIO()
+    plt.savefig(image_stream, format='png', dpi=160, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
+    image_stream.seek(0)  # Go back to the start of the BytesIO object
+
+    plt.close(fig)  # Close the figure to free up memory
+
+    return image_stream
+          
 # Main asynchronous loop to update the database at intervals
 async def update_fi_from_web(db, bot):
     while True:
@@ -235,52 +279,49 @@ def create_query(company_name, date, is_exact_date=True):
         ORDER BY timestamp DESC
         LIMIT 1
         """
+        
+async def create_timeseries(db, company_name):
+    # Get the current date
+    now = datetime.now()
+
+    # Calculate the date 30 days ago
+    thirty_days_ago = now - timedelta(days=30)
+
+    # Query the database to get the data for the last 30 days
+    query = f"""
+        SELECT timestamp, position_percent
+        FROM ShortPositions
+        WHERE company_name = '{company_name}'
+        AND timestamp >= '{thirty_days_ago.strftime("%Y-%m-%d %H:%M")}'
+        AND timestamp <= '{now.strftime("%Y-%m-%d %H:%M")}'
+        ORDER BY timestamp
+        """
+    data = pd.read_sql_query(query, db.conn)
+    print(data)
+
+    # Convert the timestamp column to datetime
+    data['timestamp'] = pd.to_datetime(data['timestamp'])
+
+    # Set the timestamp column as the index
+    data.set_index('timestamp', inplace=True)
+
+    # Resample the data to daily frequency, taking the last value of each day
+    daily_data = data.resample('D').last()
+
+    # Forward fill the missing values
+    daily_data.fillna(method='ffill', inplace=True)
+
+    return daily_data
+
+import discord
 
 async def short_command(ctx, db, company_name):
     company_name = company_name.lower()
     now = datetime.now()
 
-    # Define time points
-    time_points = {
-        'yesterday': now - timedelta(days=1),
-        'one_week_ago': now - timedelta(weeks=1)
-    }
+    image_stream = plot_timeseries(daily_data, 'Embracer Group AB')
 
-    results = {}
-    for key, time_point in time_points.items():
-        query = create_query(company_name, time_point.strftime("%Y-%m-%d"))
-        result = await execute_query(db, query)
-        if not result:  # If no exact date match, query for the latest before the date
-            query = create_query(company_name, time_point.strftime("%Y-%m-%d"), is_exact_date=False)
-            result = await execute_query(db, query)
-        results[key] = result
-
-    # Get current data
-    current_query = create_query(company_name, now.strftime("%Y-%m-%d"), is_exact_date=False)
-    current_data = await execute_query(db, current_query)
-
-    # Calculate changes and form response
-    response = ""
-    changes = []
-
-    if current_data:
-        result_yesterday = results.get('yesterday')
-        result_one_week_ago = results.get('one_week_ago')
-
-        if result_yesterday:
-            one_day_change_value = current_data[1] - result_yesterday[1]
-            changes.append(f"1D: {one_day_change_value:+.2f}%")
-
-        if result_one_week_ago:
-            one_week_change_value = current_data[1] - result_one_week_ago[1]
-            changes.append(f"1W: {one_week_change_value:+.2f}%")
-
-        changes_str = ', '.join(changes) if changes else "No recent changes"
-        response = f"The latest short position for {current_data[0]} is {current_data[1]}% ({changes_str}) with update at {current_data[2]}."
-    else:
-        response = f"No short position found for {company_name}."
-
-    await ctx.send(response)
+    await ctx.send(file=discord.File(image_stream, filename='plot.png'))
 
         
 # Entry point

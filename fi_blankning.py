@@ -204,9 +204,6 @@ async def plot_timeseries(daily_data, company_name):
     # Remove axes
     ax.axis('off')
 
-    # Add title with company name
-    ax.text(daily_data.index[0], daily_data['position_percent'].max() + 0.2, company_name, fontsize=8, ha='left',color='white')
-
     # Calculate the change over 1 day and 1 week
     change_1d = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-2]
     if len(daily_data) >= 7:
@@ -347,6 +344,7 @@ async def short_command(ctx, db, company_name):
     daily_data = await create_timeseries(db, company_name)
     image_stream = await plot_timeseries(daily_data, company_name)
 
+    await ctx.send(f'Company: {company_name}\n, current short: {daily_data.iloc[-1, 0]}%')
     await ctx.send(file=discord.File(image_stream, filename='plot.png'))
 
         

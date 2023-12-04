@@ -218,8 +218,10 @@ async def plot_timeseries(daily_data, company_name):
     else:
         change_1m = "N/A"
     # Add the change text under the title
-    ax.text(daily_data.index[0], daily_data['position_percent'].max() +0.05, f'1D ({change_1d:.2f}) 1W ({change_1w:.2f}) 1M ({change_1m:.2f})', fontsize=6, ha='left',color='white')
+    change_1w_str = str(change_1w) if isinstance(change_1w, str) else f"{change_1w:.2f}"
+    change_1m_str = str(change_1m) if isinstance(change_1m, str) else f"{change_1m:.2f}"
 
+    ax.text(daily_data.index[0], daily_data['position_percent'].max() +0.05, f'1D ({change_1d:.2f}) 1W ({change_1w_str}) 1M ({change_1m_str})', fontsize=6, ha='left',color='white')
     # Label the first and last timestamp with the position percent
     first_timestamp, last_timestamp = daily_data.index[0], daily_data.index[-1]
     first_value, last_value = daily_data.iloc[0, 0], daily_data.iloc[-1, 0]

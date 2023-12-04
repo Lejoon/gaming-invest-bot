@@ -200,7 +200,6 @@ async def plot_timeseries(daily_data, company_name):
     # Set figure background color
     fig.patch.set_facecolor('#36393F')  # Discord dark mode background color
 
-
     ax.plot(daily_data.index, daily_data['position_percent'], linewidth=1, color='#1DA1F2')
     # Remove axes
     ax.axis('off')
@@ -210,8 +209,14 @@ async def plot_timeseries(daily_data, company_name):
 
     # Calculate the change over 1 day and 1 week
     change_1d = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-2]
-    change_1w = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-7]
-    change_1m = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-30]
+    if len(daily_data) >= 7:
+        change_1w = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-7]
+    else: 
+        change_1w = "N/A"
+    if len(daily_data) >= 30: 
+        change_1m = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-30]
+    else:
+        change_1m = "N/A"
     # Add the change text under the title
     ax.text(daily_data.index[0], daily_data['position_percent'].max() +0.05, f'1D ({change_1d:.2f}) 1W ({change_1w:.2f}) 1M ({change_1m:.2f})', fontsize=6, ha='left',color='white')
 
@@ -291,8 +296,12 @@ async def create_timeseries(db, company_name):
     query = f"""
         SELECT timestamp, position_percent
         FROM ShortPositions
-        WHERE company_name LIKE '%{company_name}%'
-        AND timestamp >= '{thirty_days_ago.strftime("%Y-%m-%d %H:%M")}'
+        WHERE company_name LIKE '{company_name}'
+        AND timestamp >= (
+            SELECT MAX(timestamp) 
+            FROM ShortPositions 
+            WHERE timestamp <= '{thirty_days_ago.strftime("%Y-%m-%d %H:%M")}'
+        )
         AND timestamp <= '{now.strftime("%Y-%m-%d %H:%M")}'
         ORDER BY timestamp
         """

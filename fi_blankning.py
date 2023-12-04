@@ -213,7 +213,12 @@ async def plot_timeseries(daily_data, company_name):
     change_1m = "N/A" if len(daily_data) < 30 else daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-30]
     
     # Format the change text with consistent positioning
-    change_text = f'1D ({change_1d:.2f}) 1W ({change_1w:.2f if change_1w != "N/A" else change_1w}) 1M ({change_1m:.2f if change_1m != "N/A" else change_1m})'
+    change_1d_str = f"{change_1d:.2f}"
+    change_1w_str = f"{change_1w:.2f}" if isinstance(change_1w, (int, float)) else change_1w
+    change_1m_str = f"{change_1m:.2f}" if isinstance(change_1m, (int, float)) else change_1m
+
+    change_text = f'1D ({change_1d_str}) 1W ({change_1w_str}) 1M ({change_1m_str})'
+
     ax.text(0.5, 0.05, change_text, fontsize=8, ha='center', va='bottom', transform=ax.transAxes, color='white')
     
     # Label the first and last timestamp with the position percent at consistent locations
@@ -312,7 +317,7 @@ async def create_timeseries(db, company_name):
     daily_data = data.resample('D').last()
 
     # Forward fill the missing values
-    daily_data.fillna(method='ffill', inplace=True)
+    daily_data.ffill(inplace=True)
 
     return daily_data
 

@@ -48,21 +48,56 @@ from ig import daily_message_morning, daily_message_evening, current_index
 from placera import placera_updates
 from steam import daily_steam_database_refresh
 from fi_blankning import update_fi_from_web
+
+# Initialize the task variables to None
+websocket_task = None
+daily_morning_task = None
+daily_evening_task = None
+placera_task = None
+steam_task = None
+fi_task = None
+
 @bot.event
 async def on_ready():
+    global websocket_task, daily_morning_task, daily_evening_task, placera_task, steam_task, fi_task
+
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
-    print('Starting background websocket task.')
-    bot.loop.create_task(websocket_background_task(bot))
-    print('Starting daily morning task.') 
-    bot.loop.create_task(daily_message_morning(bot))
-    print('Starting daily evening task.') 
-    bot.loop.create_task(daily_message_evening(bot))
-    print('Starting Placera telegram loop')
-    bot.loop.create_task(placera_updates(bot))
-    print('Start Steam Daily loop')
-    bot.loop.create_task(daily_steam_database_refresh(db))
-    print('Start FI Blankning loop')
-    bot.loop.create_task(update_fi_from_web(db, bot))
+
+    if websocket_task is None or websocket_task.done():
+        print('Starting background websocket task.')
+        websocket_task = bot.loop.create_task(websocket_background_task(bot))
+    else:
+        print('Background websocket task is already running.')
+
+    if daily_morning_task is None or daily_morning_task.done():
+        print('Starting daily morning task.') 
+        daily_morning_task = bot.loop.create_task(daily_message_morning(bot))
+    else:
+        print('Daily morning task is already running.')
+
+    if daily_evening_task is None or daily_evening_task.done():
+        print('Starting daily evening task.') 
+        daily_evening_task = bot.loop.create_task(daily_message_evening(bot))
+    else:
+        print('Daily evening task is already running.')
+
+    if placera_task is None or placera_task.done():
+        print('Starting Placera telegram loop')
+        placera_task = bot.loop.create_task(placera_updates(bot))
+    else:
+        print('Placera telegram loop is already running.')
+
+    if steam_task is None or steam_task.done():
+        print('Start Steam Daily loop')
+        steam_task = bot.loop.create_task(daily_steam_database_refresh(db))
+    else:
+        print('Steam Daily loop is already running.')
+
+    if fi_task is None or fi_task.done():
+        print('Start FI Blankning loop')
+        fi_task = bot.loop.create_task(update_fi_from_web(db, bot))
+    else:
+        print('FI Blankning loop is already running.')
     
 @bot.command()
 async def index(ctx):

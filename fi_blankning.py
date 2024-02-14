@@ -25,6 +25,7 @@ FILE_PATHS = {'DATA_AGG': 'Blankningsregisteraggregat.ods',
               'TIMESTAMP': 'last_known_timestamp.txt'}
 DELAY_TIME = 15*60
 CHANNEL_ID = 1175019650963222599
+ERROR_ID = 1162053416290361516
 TRACKED_COMPANIES = set([
     'Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB',
     'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive',
@@ -70,21 +71,24 @@ async def download_file(session, url, path):
         f.write(content)
         
 async def read_aggregate_data(path):
-    df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
-    os.remove(path)
-    
-    new_column_names = {
-        df.columns[0]: 'company_name',
-        df.columns[1]: 'lei',
-        df.columns[2]: 'position_percent',
-        df.columns[3]: 'latest_position_date'
-    }
-    df.rename(columns=new_column_names, inplace=True)
-    
-    if 'company_name' in df.columns:
-        df['company_name'] = df['company_name'].str.strip()
+    try: 
+        df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
+        os.remove(path)
         
-    return df
+        new_column_names = {
+            df.columns[0]: 'company_name',
+            df.columns[1]: 'lei',
+            df.columns[2]: 'position_percent',
+            df.columns[3]: 'latest_position_date'
+        }
+        df.rename(columns=new_column_names, inplace=True)
+        
+        if 'company_name' in df.columns:
+            df['company_name'] = df['company_name'].str.strip()
+            
+        return df
+    except Exception as e:
+        await report_error_to_channel(bot, e)
 
 async def read_current_data(path):
     df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
@@ -103,6 +107,25 @@ async def read_current_data(path):
     df['issuer_name'] = df['issuer_name'].str.strip()
         
     return df
+
+async def report_error_to_channel(bot, exception):
+    """
+    Sends an error message to a specific Discord channel.
+
+    Parameters:
+    - bot: The Discord bot instance.
+    - channel_id (int): The ID of the channel where the message should be sent.
+    - exception (Exception): The exception object to report.
+    """
+    channel = bot.get_channel(ERROR_ID)
+    if channel:
+        # Format the error message
+        error_message = f"An error occurred: {type(exception).__name__}: {exception}"
+        # Send the message to the channel
+        await channel.send(error_message)
+    else:
+        print(f"Could not find a channel with ID {ERROR_ID}")
+
 
 async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 
@@ -246,24 +269,32 @@ async def update_fi_from_web(db, bot):
                 continue
             
             await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
-            new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
+            try: 
+                new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
 
-            old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
-            await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
+                old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
+                await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
+                
+                log_message('Database updated with new shorts if any.')
+                await asyncio.sleep(DELAY_TIME)
+            except Exception as e:
+                await report_error_to_channel(bot, e)
             
-            log_message('Database updated with new shorts if any.')
-            await asyncio.sleep(DELAY_TIME)
+        
 
 
 async def manual_update(db):
     async with aiohttp_session() as session:
         await download_file(session,URLS['DATA_AGG'], FILE_PATHS['DATA'])
-        new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
-        old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
+        try:
+            new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
+            old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
 
-        update_database_diff(old_data, new_data, db)
+            update_database_diff(old_data, new_data, db)
 
-        log_message('Manual update of database completed.')
+            log_message('Manual update of database completed.')
+        except Exception as e:
+            await report_error_to_channel(e)
 
 
 async def execute_query(db, query):

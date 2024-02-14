@@ -70,7 +70,7 @@ async def download_file(session, url, path):
     with open(path, 'wb') as f:
         f.write(content)
         
-async def read_aggregate_data(path):
+async def read_aggregate_data(path, bot):
     try: 
         df = pd.read_excel(path, sheet_name='Blad1', skiprows=5, engine="odf")
         os.remove(path)
@@ -270,7 +270,7 @@ async def update_fi_from_web(db, bot):
             
             await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
             try: 
-                new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
+                new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'], bot)
 
                 old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
                 await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
@@ -283,11 +283,11 @@ async def update_fi_from_web(db, bot):
         
 
 
-async def manual_update(db):
+async def manual_update(db, bot):
     async with aiohttp_session() as session:
         await download_file(session,URLS['DATA_AGG'], FILE_PATHS['DATA'])
         try:
-            new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'])
+            new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'],bot)
             old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
 
             update_database_diff(old_data, new_data, db)
@@ -386,4 +386,4 @@ if __name__ == "__main__":
     #drop shortpositions
     #db.cursor.execute('DROP TABLE ShortPositions')
     db.create_tables()
-    asyncio.run(update_fi_from_web(db))
+    asyncio.run(update_fi_from_web(db, bot))

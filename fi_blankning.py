@@ -226,7 +226,8 @@ async def plot_timeseries(daily_data, company_name):
     # Adjusting figure size and setting a professional font
     plt.figure(figsize=(4, 2))
     rcParams.update({'font.size': 7})  # Adjust font size
-    plt.rcParams['savefig.dpi'] = 300  # Increase DPI for higher fidelity in saved figure
+    plt.rcParams['savefig.dpi'] = 90  # Increase DPI for higher fidelity in saved figure
+    # lower size in saved figure
     plt.rcParams['font.family'] = ['sans-serif']
     plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
 
@@ -262,7 +263,7 @@ async def plot_timeseries(daily_data, company_name):
 
     # Generate image stream
     image_stream = io.BytesIO()
-    plt.savefig(image_stream, format='png', dpi=300)
+    plt.savefig(image_stream, format='png', dpi=90)
     image_stream.seek(0)
     plt.close()
     return image_stream

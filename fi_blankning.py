@@ -218,57 +218,9 @@ async def is_timestamp_updated(session):
     return web_timestamp
 
 async def plot_timeseries(daily_data, company_name):
-    # Ensure the 'timestamp' column is a datetime type and set as index
-    daily_data['timestamp'] = pd.to_datetime(daily_data['timestamp'])
-    daily_data.set_index('timestamp', inplace=True)
-
-    # Filter last 3 months of data
-    three_months_ago = pd.Timestamp.now() - pd.DateOffset(months=3)
-    filtered_data = daily_data[daily_data.index >= three_months_ago]
-
-    filtered_data['position_percent'] = filtered_data['position_percent'] / 100  # Scaling down by 100
-
-    # Adjusting figure size and setting a professional font
-    plt.figure(figsize=(4, 2))
-    rcParams.update({'font.size': 7})  # Adjust font size
-    plt.rcParams['savefig.dpi'] = 300  # Increase DPI for higher fidelity in saved figure
-    plt.rcParams['font.family'] = ['sans-serif']
-    plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
-
-    # Formatting the plot
-    plt.plot(filtered_data.index, filtered_data['position_percent'], marker='o', linestyle='-', color='#7289DA', markersize=3)
-    
-    plt.title(f'{company_name}, ShortS Percentage Last 3m'.upper(), fontsize=6, weight='bold', loc='left')
-    plt.xlabel('')
-    plt.ylabel('')  # Y-axis label removed as per request
-
-    # Set y-axis to display percentage
-    plt.gca().yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=1))
-
-    # Improve date formatting on x-axis
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
-    plt.gcf().autofmt_xdate()  # Rotate date labels
-
-    # Thin and transparent grid lines
-    plt.grid(True, which='both', linestyle='-', linewidth=0.5, color='gray', alpha=0.3)
-
-    # Remove plot outline
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
-    plt.gca().spines['bottom'].set_visible(False)
-    plt.gca().spines['left'].set_visible(False)
-
-    # Adjust tick size
-    plt.tick_params(axis='x', labelsize=6)
-    plt.tick_params(axis='y', labelsize=6)
-
-    # Display the plot
-    plt.tight_layout()
-    plt.show()
-    # Ensure the 'timestamp' column is a datetime type and set as index
-    daily_data['timestamp'] = pd.to_datetime(daily_data['timestamp'])
-    daily_data.set_index('timestamp', inplace=True)
+    # Ensure the 0th column is a datetime type and set as index'
+    daily_data.iloc[:, 0] = pd.to_datetime(daily_data.iloc[:, 0])
+    daily_data.set_index(daily_data.columns[0], inplace=True)
 
     # Filter last 3 months of data
     three_months_ago = pd.Timestamp.now() - pd.DateOffset(months=3)
@@ -433,12 +385,3 @@ async def short_command(ctx, db, company_name):
     await ctx.send(f'Company: {company_name}, {daily_data.iloc[-1, 0]}% total shorted above with smallest individual position > 0.1%')
     await ctx.send(file=discord.File(image_stream, filename='plot.png'))
 
-        
-# Entry point
-if __name__ == "__main__":
-    db = Database('steam_top_games.db')  # Replace with your actual DB name
-
-    #drop shortpositions
-    #db.cursor.execute('DROP TABLE ShortPositions')
-    db.create_tables()
-    asyncio.run(update_fi_from_web(db, bot))

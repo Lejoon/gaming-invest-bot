@@ -329,7 +329,7 @@ async def create_timeseries(db, company_name):
     now = datetime.now()
 
     # Calculate the date 30 days ago
-    thirty_days_ago = now - timedelta(days=30)
+    thirty_days_ago = now - timedelta(months=3)
 
     # Query the database to get the data for the last 30 days
     query = f"""

@@ -218,9 +218,6 @@ async def is_timestamp_updated(session):
     return web_timestamp
 
 async def plot_timeseries(daily_data, company_name):
-    # Ensure the 0th column is a datetime type and set as index'
-    daily_data.iloc[:, 0] = pd.to_datetime(daily_data.iloc[:, 0])
-    daily_data.set_index(daily_data.columns[0], inplace=True)
 
     # Filter last 3 months of data
     three_months_ago = pd.Timestamp.now() - pd.DateOffset(months=3)

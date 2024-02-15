@@ -243,7 +243,6 @@ async def plot_timeseries(daily_data, company_name):
     # Improve date formatting on x-axis
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
     plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
-    plt.gcf().autofmt_xdate()  # Rotate date labels
 
     # Thin and transparent grid lines
     plt.grid(True, which='both', linestyle='-', linewidth=0.5, color='gray', alpha=0.3)

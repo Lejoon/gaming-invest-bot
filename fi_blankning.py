@@ -213,51 +213,99 @@ async def is_timestamp_updated(session):
     write_last_known_timestamp(FILE_PATHS['TIMESTAMP'], web_timestamp)
     log_message(f'New web timestamp detected ({web_timestamp}). Updating database at {next_update_time.strftime("%Y-%m-%d %H:%M")}.')
     return web_timestamp
-          
+
 async def plot_timeseries(daily_data, company_name):
-   # Load the Roboto font
-    #roboto_font = fm.FontProperties(fname='/System/Library/Fonts/Supplemental/Arial.ttf')
+    # Load external font (if desired)
+    # import matplotlib.font_manager as fm
+    # roboto_font = fm.FontProperties(fname='/path/to/Roboto.ttf')  # Example
 
-    fig, ax = plt.subplots(figsize=(2.5, 1.5))  # Adjust figure size to 50%
-    
-    # Set figure background color
-    fig.patch.set_facecolor('#36393F')  # Discord dark mode background color
+    # Dynamically adjust figure size to content
+    figsize = (6, 2.5) if len(daily_data) > 15 else (4, 2.5) 
+    fig, ax = plt.subplots(figsize=figsize)
 
+    # Set background color 
+    fig.patch.set_facecolor('#36393F')
+
+    # Plot the timeseries line
     ax.plot(daily_data.index, daily_data['position_percent'], linewidth=1, color='#1DA1F2')
-    # Remove axes
-    ax.axis('off')
 
-    # Calculate the change over 1 day and 1 week
+    # Axis titles and formatting
+    ax.set_xlabel('Date') 
+    ax.set_ylabel('Short Percent')
+    ax.tick_params(axis='both', colors='white') 
+
+    # Position value labels within plot area
+    for x, y in zip(daily_data.index, daily_data['position_percent']):
+        label = f"{y:.2f}"
+        ax.annotate(label, (x, y), textcoords="offset points", xytext=(0, 5), ha='center', color='white')
+
+    # Changes over different periods
     change_1d = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-2]
-    if len(daily_data) >= 7:
-        change_1w = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-7]
-    else: 
-        change_1w = "N/A"
-    if len(daily_data) >= 30: 
-        change_1m = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-30]
-    else:
-        change_1m = "N/A"
-    # Add the change text under the title
-    change_1w_str = str(change_1w) if isinstance(change_1w, str) else f"{change_1w:.2f}"
-    change_1m_str = str(change_1m) if isinstance(change_1m, str) else f"{change_1m:.2f}"
+    change_1w = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-7] if len(daily_data) >= 7 else "N/A"
+    change_1m = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-30] if len(daily_data) >= 30 else "N/A"
 
-    ax.text(daily_data.index[0], daily_data['position_percent'].max() +0.05, f'1D ({change_1d:.2f}) 1W ({change_1w_str}) 1M ({change_1m_str})', fontsize=6, ha='left',color='white')
-    # Label the first and last timestamp with the position percent
-    first_timestamp, last_timestamp = daily_data.index[0], daily_data.index[-1]
-    first_value, last_value = daily_data.iloc[0, 0], daily_data.iloc[-1, 0]
-    ax.text(first_timestamp, first_value, f'{first_value:.2f}', ha='right',  fontsize=6, bbox=dict(facecolor='#36393F', edgecolor='none', pad=1), color='white')
-    ax.text(last_timestamp, last_value, f'{last_value:.2f}', ha='left',  fontsize=6, bbox=dict(facecolor='#36393F', edgecolor='none', pad=1), color='white')
+    change_text = f'1D ({change_1d:.2f})  1W ({change_1w})  1M ({change_1m})'
+    ax.text(0.02, 0.95, change_text, ha='left', va='top', color='white',
+            fontsize=9, transform=ax.transAxes) 
+
+    # Inline title with subtitle
+    title = f'{company_name}'
+    subtitle = f'Last 30 Days' 
+    ax.set_title(f"{title}\n{subtitle}", color='white') 
 
     plt.tight_layout()
 
-    # Save the figure to a BytesIO object
+    # Generate image stream
     image_stream = io.BytesIO()
-    plt.savefig(image_stream, format='png', dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
-    image_stream.seek(0)  # Go back to the start of the BytesIO object
-
-    plt.close(fig)  # Close the figure to free up memory
-
+    plt.savefig(image_stream, format='png', dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')
+    image_stream.seek(0)
+    plt.close(fig) 
     return image_stream
+
+# async def plot_timeseries(daily_data, company_name):
+#    # Load the Roboto font
+#     #roboto_font = fm.FontProperties(fname='/System/Library/Fonts/Supplemental/Arial.ttf')
+
+#     fig, ax = plt.subplots(figsize=(2.5, 1.5))  # Adjust figure size to 50%
+    
+#     # Set figure background color
+#     fig.patch.set_facecolor('#36393F')  # Discord dark mode background color
+
+#     ax.plot(daily_data.index, daily_data['position_percent'], linewidth=1, color='#1DA1F2')
+#     # Remove axes
+#     ax.axis('off')
+
+#     # Calculate the change over 1 day and 1 week
+#     change_1d = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-2]
+#     if len(daily_data) >= 7:
+#         change_1w = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-7]
+#     else: 
+#         change_1w = "N/A"
+#     if len(daily_data) >= 30: 
+#         change_1m = daily_data['position_percent'].iloc[-1] - daily_data['position_percent'].iloc[-30]
+#     else:
+#         change_1m = "N/A"
+#     # Add the change text under the title
+#     change_1w_str = str(change_1w) if isinstance(change_1w, str) else f"{change_1w:.2f}"
+#     change_1m_str = str(change_1m) if isinstance(change_1m, str) else f"{change_1m:.2f}"
+
+#     ax.text(daily_data.index[0], daily_data['position_percent'].max() +0.05, f'1D ({change_1d:.2f}) 1W ({change_1w_str}) 1M ({change_1m_str})', fontsize=6, ha='left',color='white')
+#     # Label the first and last timestamp with the position percent
+#     first_timestamp, last_timestamp = daily_data.index[0], daily_data.index[-1]
+#     first_value, last_value = daily_data.iloc[0, 0], daily_data.iloc[-1, 0]
+#     ax.text(first_timestamp, first_value, f'{first_value:.2f}', ha='right',  fontsize=6, bbox=dict(facecolor='#36393F', edgecolor='none', pad=1), color='white')
+#     ax.text(last_timestamp, last_value, f'{last_value:.2f}', ha='left',  fontsize=6, bbox=dict(facecolor='#36393F', edgecolor='none', pad=1), color='white')
+
+#     plt.tight_layout()
+
+#     # Save the figure to a BytesIO object
+#     image_stream = io.BytesIO()
+#     plt.savefig(image_stream, format='png', dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')  # Save the figure with a resolution that fits a 200x150 image
+#     image_stream.seek(0)  # Go back to the start of the BytesIO object
+
+#     plt.close(fig)  # Close the figure to free up memory
+
+#     return image_stream
           
 # Main asynchronous loop to update the database at intervals
 async def update_fi_from_web(db, bot):

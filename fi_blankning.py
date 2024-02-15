@@ -328,10 +328,10 @@ async def create_timeseries(db, company_name):
     # Get the current date
     now = datetime.now()
 
-    # Calculate the date 30 days ago
-    thirty_days_ago = now - timedelta(months=3)
+    # Calculate the date 3 months ago
+    three_months_ago = pd.Timestamp.now() - pd.DateOffset(months=3)
 
-    # Query the database to get the data for the last 30 days
+    # Query the database to get the data for the last 3 months
     query = f"""
         SELECT timestamp, position_percent
         FROM ShortPositions
@@ -339,7 +339,7 @@ async def create_timeseries(db, company_name):
         AND timestamp >= (
             SELECT MAX(timestamp) 
             FROM ShortPositions 
-            WHERE timestamp <= '{thirty_days_ago.strftime("%Y-%m-%d %H:%M")}'
+            WHERE timestamp <= '{three_months_ago.strftime("%Y-%m-%d %H:%M")}'
         )
         AND timestamp <= '{now.strftime("%Y-%m-%d %H:%M")}'
         ORDER BY timestamp

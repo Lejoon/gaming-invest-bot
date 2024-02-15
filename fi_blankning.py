@@ -262,7 +262,7 @@ async def plot_timeseries(daily_data, company_name):
 
     # Generate image stream
     image_stream = io.BytesIO()
-    plt.savefig(image_stream, format='png')
+    plt.savefig(image_stream, format='png', dpi=300)
     image_stream.seek(0)
     plt.close()
     return image_stream

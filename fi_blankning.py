@@ -219,9 +219,9 @@ async def is_timestamp_updated(session):
 
 async def plot_timeseries(daily_data, company_name):
     three_months_ago = pd.Timestamp.now() - pd.DateOffset(months=3)
-    filtered_data = daily_data[daily_data.index >= three_months_ago]
+    daily_data = daily_data[daily_data.index >= three_months_ago]
 
-    filtered_data['position_percent'] = filtered_data['position_percent'] / 100  # Scaling down by 100
+    daily_data.loc[:,'position_percent'] = daily_data['position_percent'] / 100  # Scaling down by 100
 
     # Adjusting figure size and setting a professional font
     plt.figure(figsize=(4, 2))
@@ -230,7 +230,7 @@ async def plot_timeseries(daily_data, company_name):
     plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
 
     # Formatting the plot
-    plt.plot(filtered_data.index, filtered_data['position_percent'], marker='o', linestyle='-', color='#7289DA', markersize=3)
+    plt.plot(daily_data.index, daily_data['position_percent'], marker='o', linestyle='-', color='#7289DA', markersize=3)
     
     plt.title(f'{company_name}, ShortS Percentage Last 3m'.upper(), fontsize=6, weight='bold', loc='left')
     plt.xlabel('')

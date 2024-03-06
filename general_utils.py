@@ -3,7 +3,7 @@ import asyncio
 import random
 import aiohttp
 
-def log_message(message):
+def log_message(message, bot):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     print(f'[LOG] {timestamp} - {message}')
     

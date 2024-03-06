@@ -62,6 +62,7 @@ def write_last_known_timestamp(file_path, timestamp):
     with open(file_path, 'w') as f:
         f.write(timestamp)
 
+@aiohttp_retry(retries=5, base_delay=5.0, max_delay=120.0)
 async def fetch_last_update_time(session):
     content = await fetch_url(session, URLS['TIMESTAMP'])
     soup = BeautifulSoup(content, 'html.parser')
@@ -267,6 +268,7 @@ async def plot_timeseries(daily_data, company_name):
     return image_stream
 
 # Main asynchronous loop to update the database at intervals
+@aiohttp_retry(retries=5, base_delay=5.0, max_delay=120.0)
 async def update_fi_from_web(db, bot):
     while True:
         async with aiohttp_session() as session:

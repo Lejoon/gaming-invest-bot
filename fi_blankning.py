@@ -33,7 +33,7 @@ TRACKED_COMPANIES = set([
     'Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB',
     'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive',
     'G5 Entertainment AB (publ)', 'Modern Times Group MTG AB', 'Thunderful',
-    'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)'
+    'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)', 'Company D'
 ])
 
 @asynccontextmanager
@@ -103,13 +103,14 @@ async def read_current_data(path):
         df.columns[1]: 'issuer_name',
         df.columns[2]: 'isin',
         df.columns[3]: 'position_percent',
-        df.columns[4]: 'latest_position_date'
+        df.columns[4]: 'position_date',
+        df.columns[5]: 'comment'
     }
     df.rename(columns=new_column_names, inplace=True)
     
-    df['company_name'] = df['company_name'].str.strip()
     df['issuer_name'] = df['issuer_name'].str.strip()
-        
+    
+    
     return df
 
 async def report_error_to_channel(bot, exception):
@@ -130,8 +131,88 @@ async def report_error_to_channel(bot, exception):
     else:
         print(f"Could not find a channel with ID {ERROR_ID}")
 
+async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db, fetched_timestamp, bot=None):
+    if bot is not None:
+        channel = bot.get_channel(CHANNEL_ID)
 
-async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
+    agg_new_rows = await update_database_diff(old_agg_data, new_agg_data, db, fetched_timestamp)
+    act_new_rows = await update_position_holders(old_act_data, new_act_data, db, fetched_timestamp)
+
+    for _, row in agg_new_rows.iterrows():
+        print(row['company_name'])
+        company_name = row['company_name']
+        new_position_percent = row['position_percent']
+        lei = row['lei']
+        timestamp = row['timestamp']
+
+        if company_name in TRACKED_COMPANIES:
+            old_position_data = old_agg_data.loc[old_agg_data['company_name'] == company_name]
+            old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
+
+            change = None
+            if old_position_percent is not None:
+                change = new_position_percent - old_position_percent
+
+            description = f"Ändrad blankning: {new_position_percent}%"
+            if change is not None:
+                description += f" ({change:+.2f})" if change > 0 else f" ({change:-.2f})"
+
+            issuer_data = act_new_rows[act_new_rows['issuer_name'] == company_name]
+
+            if not issuer_data.empty:
+                holder_description = "\nÄndringar i individuella blankningspositioner:\n"
+                for _, holder_row in issuer_data.iterrows():
+                    entity_name = holder_row['entity_name']
+                    new_holder_percent = holder_row['position_percent']
+                    old_holder_data = old_act_data[(old_act_data['entity_name'] == entity_name) & (old_act_data['issuer_name'] == company_name)]
+                    old_holder_percent = old_holder_data['position_percent'].iloc[0] if not old_holder_data.empty else 0
+                    holder_change = new_holder_percent - old_holder_percent
+
+                    holder_description += f"{entity_name}: {new_holder_percent}% ({holder_change:+.2f})\n"
+
+                description += holder_description
+            if bot is not None:
+                embed = Embed(
+                    title=company_name,
+                    description=description,
+                    url=f"https://www.fi.se/sv/vara-register/blankningsregistret/emittent/?id={lei}",
+                    timestamp=datetime.strptime(timestamp, "%Y-%m-%d %H:%M")
+                )
+                embed.set_footer(text="FI", icon_url="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Financial_Supervisory_Authority_%28Sweden%29_logo.svg/320px-Financial_Supervisory_Authority_%28Sweden%29_logo.svg.png")
+
+                await channel.send(embed=embed)
+            else:
+                print('Test embedding')
+                print(description)
+
+async def update_position_holders(old_data, new_data, db, fetched_timestamp):
+    if old_data.empty:
+        new_data['timestamp'] = fetched_timestamp
+        db.insert_bulk_data(input=new_data, table='PositionHolders')
+        return
+    
+    if not new_data.empty:
+        new_data['timestamp'] = fetched_timestamp
+        
+    old_data = old_data.sort_values('timestamp').drop_duplicates(['entity_name', 'issuer_name', 'isin'], keep='last')
+    new_data = new_data.sort_values('timestamp').drop_duplicates(['entity_name', 'issuer_name', 'isin'], keep='last')
+    
+    new_positions = new_data.loc[~new_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1).isin(old_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1))]
+    common_positions = new_data.loc[new_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1).isin(old_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1))]
+
+    changed_positions = pd.merge(common_positions, old_data, on=['entity_name', 'issuer_name', 'isin'])
+    changed_positions = changed_positions[changed_positions['position_percent_x'] != changed_positions['position_percent_y']]
+    changed_positions = changed_positions[['entity_name', 'issuer_name', 'isin', 'position_percent_x', 'position_date_x']]
+    changed_positions.columns = ['entity_name', 'issuer_name', 'isin', 'position_percent', 'position_date']
+    
+    new_positions['timestamp'] = fetched_timestamp
+    changed_positions['timestamp'] = fetched_timestamp
+    new_rows = pd.concat([new_positions, changed_positions])
+
+    db.insert_bulk_data(input=new_rows, table='PositionHolders')
+    return new_rows
+
+async def update_database_diff(old_data, new_data, db, fetched_timestamp):
 
     if old_data.empty:
         new_data['timestamp'] = fetched_timestamp
@@ -160,40 +241,7 @@ async def update_database_diff(old_data, new_data, db, fetched_timestamp, bot):
 
     # Insert new and updated records
     db.insert_bulk_data(input=new_rows, table='ShortPositions')
-    
-    if not new_rows.empty:
-        channel = bot.get_channel(CHANNEL_ID)
-
-        for _, row in new_rows.iterrows():
-            company_name = row['company_name']
-            new_position_percent = row['position_percent']
-            lei = row['lei']
-            timestamp = row['timestamp']
-
-            # Check for exact matches in companies_to_track
-            if company_name in TRACKED_COMPANIES:
-                # Find the old position for this company if available
-                old_position_data = old_data.loc[old_data['company_name'] == company_name]
-                old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
-
-                change = None
-                if old_position_percent is not None:
-                    change = new_position_percent - old_position_percent
-
-                description = f"Ändrad blankning: {new_position_percent}%"
-                if change is not None:
-                    description += f" ({change:+.2f})" if change > 0 else f" ({change:-.2f})"
-                    
-                embed = Embed(
-                    title=company_name, 
-                    description=description,
-                    url=f"https://www.fi.se/sv/vara-register/blankningsregistret/emittent/?id={lei}",
-                    timestamp=datetime.strptime(timestamp, "%Y-%m-%d %H:%M")
-                )
-                embed.set_footer(text="FI", icon_url="https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Financial_Supervisory_Authority_%28Sweden%29_logo.svg/320px-Financial_Supervisory_Authority_%28Sweden%29_logo.svg.png")
-
-                if channel:
-                    await channel.send(embed=embed)
+    return new_rows
 
 async def is_timestamp_updated(session):
     last_known_timestamp = read_last_known_timestamp(FILE_PATHS['TIMESTAMP'])
@@ -288,9 +336,6 @@ async def update_fi_from_web(db, bot):
                 await asyncio.sleep(DELAY_TIME)
             except Exception as e:
                 await report_error_to_channel(bot, e)
-            
-        
-
 
 async def manual_update(db, bot):
     async with aiohttp_session() as session:

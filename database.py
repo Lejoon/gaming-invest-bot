@@ -2,6 +2,18 @@
 import sqlite3
 from datetime import datetime, timedelta
 
+POSITION_HOLDERS_SCHEMA = '''
+        CREATE TABLE IF NOT EXISTS PositionHolders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_name TEXT,
+            issuer_name TEXT,
+            isin TEXT,
+            position_percent REAL,
+            position_date TEXT,
+            timestamp TEXT
+        );
+    '''
+
 GAME_TRANSLATION_SCHEMA = '''
         CREATE TABLE IF NOT EXISTS GameTranslation (
             appid TEXT PRIMARY KEY,
@@ -54,6 +66,7 @@ class Database:
         self.cursor.execute(STEAM_TOP_GAMES_SCHEMA)
         self.cursor.execute(SHORT_POSITIONS_SCHEMA)
         self.cursor.execute(REPORTED_ENTITIES_SCHEMA)
+        self.cursor.execute(POSITION_HOLDERS_SCHEMA)
         self.conn.commit()
         
     def get_latest_timestamp(self, table):

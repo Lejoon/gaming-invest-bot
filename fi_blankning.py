@@ -115,22 +115,26 @@ async def read_current_data(path):
     return df
 
 async def report_error_to_channel(bot, exception):
-    """
-    Sends an error message to a specific Discord channel.
-
-    Parameters:
-    - bot: The Discord bot instance.
-    - channel_id (int): The ID of the channel where the message should be sent.
-    - exception (Exception): The exception object to report.
-    """
-    channel = bot.get_channel(ERROR_ID)
-    if channel:
-        # Format the error message
+    error_channel = bot.get_channel(ERROR_ID)
+    public_channel = bot.get_channel(CHANNEL_ID)
+    
+    if error_channel and public_channel:
         error_message = f"An error occurred: {type(exception).__name__}: {exception}"
-        # Send the message to the channel
-        await channel.send(error_message)
+        await error_channel.send(error_message)
+        
+        public_message = "The FI website is currently unresponsive. We will notify you once it's back up."
+        public_msg = await public_channel.send(public_message)
+        
+        return public_msg  # Return the message object
     else:
-        print(f"Could not find a channel with ID {ERROR_ID}")
+        print(f"Could not find channels with IDs {ERROR_ID} and {CHANNEL_ID}")
+        
+async def delete_error_message(message):
+    if message:
+        try:
+            await message.delete()
+        except discord.NotFound:
+            pass  # Message already deleted
 
 async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db, fetched_timestamp, bot=None):
     if bot is not None:
@@ -338,9 +342,19 @@ async def update_fi_from_web(db, bot):
                 await send_embed(old_data_agg, new_data_agg, old_data_act, new_data_act, db, web_timestamp, bot)
                 
                 log_message('Database updated with new shorts if any.')
+                
+                # Delete the error message if it exists
+                await delete_error_message(error_msg)
+                error_msg = None
+                
                 await asyncio.sleep(DELAY_TIME)
+                
+                
             except Exception as e:
-                await report_error_to_channel(bot, e)
+                if error_msg == None:
+                    await report_error_to_channel(bot, e)
+                else:
+                    pass
 
 async def manual_update(db, bot):
     async with aiohttp_session() as session:

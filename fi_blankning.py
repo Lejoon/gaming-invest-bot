@@ -33,7 +33,7 @@ TRACKED_COMPANIES = set([
     'Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB',
     'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive',
     'G5 Entertainment AB (publ)', 'Modern Times Group MTG AB', 'Thunderful',
-    'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)', 'Company D'
+    'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)'
 ])
 
 @asynccontextmanager
@@ -139,7 +139,6 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
     act_new_rows = await update_position_holders(old_act_data, new_act_data, db, fetched_timestamp)
 
     for _, row in agg_new_rows.iterrows():
-        print(row['company_name'])
         company_name = row['company_name']
         new_position_percent = row['position_percent']
         lei = row['lei']
@@ -148,27 +147,29 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
         if company_name in TRACKED_COMPANIES:
             old_position_data = old_agg_data.loc[old_agg_data['company_name'] == company_name]
             old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
+            time_new_position = agg_new_rows.loc[agg_new_rows['company_name'] == company_name, 'timestamp'].iloc[0]
 
             change = None
             if old_position_percent is not None:
                 change = new_position_percent - old_position_percent
 
-            description = f"Ändrad blankning: {new_position_percent}%"
+            description = f"Ändrad blankning: {new_position_percent}%, {time_new_position}"
             if change is not None:
                 description += f" ({change:+.2f})" if change > 0 else f" ({change:-.2f})"
 
             issuer_data = act_new_rows[act_new_rows['issuer_name'] == company_name]
 
             if not issuer_data.empty:
-                holder_description = "\nÄndringar i individuella blankningspositioner:\n"
+                holder_description = "\n"
                 for _, holder_row in issuer_data.iterrows():
                     entity_name = holder_row['entity_name']
                     new_holder_percent = holder_row['position_percent']
                     old_holder_data = old_act_data[(old_act_data['entity_name'] == entity_name) & (old_act_data['issuer_name'] == company_name)]
                     old_holder_percent = old_holder_data['position_percent'].iloc[0] if not old_holder_data.empty else 0
+                    time_holder_position = holder_row['position_date']
                     holder_change = new_holder_percent - old_holder_percent
 
-                    holder_description += f"{entity_name}: {new_holder_percent}% ({holder_change:+.2f})\n"
+                    holder_description += f"{entity_name}: {new_holder_percent}% ({holder_change:+.2f}), senast uppdaterad {time_holder_position}\n"
 
                 description += holder_description
             if bot is not None:
@@ -281,7 +282,7 @@ async def plot_timeseries(daily_data, company_name):
     # Formatting the plot
     plt.plot(daily_data.index, daily_data['position_percent'], marker='o', linestyle='-', color='#7289DA', markersize=3)
     
-    plt.title(f'{company_name}, ShortS Percentage Last 3m'.upper(), fontsize=6, weight='bold', loc='left')
+    plt.title(f'{company_name}, Shorts Percentage Last 3m'.upper(), fontsize=6, weight='bold', loc='left')
     plt.xlabel('')
     plt.ylabel('')  # Y-axis label removed as per request
 

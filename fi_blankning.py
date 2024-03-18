@@ -326,11 +326,15 @@ async def update_fi_from_web(db, bot):
                 continue
             
             await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
+            await download_file(session, URLS['DATA_ACT'], FILE_PATHS['DATA_ACT'])
             try: 
-                new_data = await read_aggregate_data(FILE_PATHS['DATA_AGG'], bot)
+                new_data_agg = await read_aggregate_data(FILE_PATHS['DATA_AGG'], bot)
+                new_data_act = await read_current_data(FILE_PATHS['DATA_ACT'])
 
-                old_data = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
-                await update_database_diff(old_data, new_data, db, fetched_timestamp=web_timestamp, bot=bot)
+                old_data_agg = pd.read_sql('SELECT * FROM ShortPositions', db.conn)
+                old_data_act = pd.read_sql('SELECT * FROM PositionHolders', db.conn)
+                
+                await send_embed(old_data_agg, new_data_agg, old_data_act, new_data_act, db, web_timestamp, bot)
                 
                 log_message('Database updated with new shorts if any.')
                 await asyncio.sleep(DELAY_TIME)

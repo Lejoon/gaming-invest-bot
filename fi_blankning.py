@@ -122,7 +122,7 @@ async def report_error_to_channel(bot, exception):
         error_message = f"An error occurred: {type(exception).__name__}: {exception}"
         await error_channel.send(error_message)
         
-        public_message = "The FI website is currently unresponsive. We will notify you once it's back up."
+        public_message = "Can't fetch the FI short interest files. This message will auto-delete once they are fetched."
         public_msg = await public_channel.send(public_message)
         
         return public_msg  # Return the message object
@@ -323,6 +323,7 @@ async def plot_timeseries(daily_data, company_name):
 # Main asynchronous loop to update the database at intervals
 @aiohttp_retry(retries=5, base_delay=5.0, max_delay=120.0)
 async def update_fi_from_web(db, bot):
+    error_msg = None
     while True:
         async with aiohttp_session() as session:
             web_timestamp = await is_timestamp_updated(session)
@@ -352,7 +353,7 @@ async def update_fi_from_web(db, bot):
                 
             except Exception as e:
                 if error_msg == None:
-                    await report_error_to_channel(bot, e)
+                    error_msg = await report_error_to_channel(bot, e)
                 else:
                     pass
 

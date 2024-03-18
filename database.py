@@ -95,12 +95,22 @@ class Database:
             '''
             data = [(game['timestamp'], game['count'], game['appid'], game['discount'], game['ccu']) for game in input]
 
-        if table == 'ShortPositions':
+        elif table == 'ShortPositions':
             query = '''
             INSERT INTO ShortPositions (timestamp, company_name, lei, position_percent, latest_position_date)
             VALUES (?, ?, ?, ?, ?);
             '''
             data = [(row['timestamp'],row['company_name'], row['lei'], row['position_percent'], row['latest_position_date']) for _, row in input.iterrows()]
+            
+        elif table == 'PositionHolders':
+            query = '''
+            INSERT INTO PositionHolders (entity_name, issuer_name, isin, position_percent, position_date, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?);
+            '''
+            data = [(row['entity_name'], row['issuer_name'], row['isin'], row['position_percent'], row['position_date'], row['timestamp']) for _, row in input.iterrows()]
+
+        else:
+            raise ValueError(f"Invalid table name: {table}")
 
         self.cursor.executemany(query, data)
         self.conn.commit()

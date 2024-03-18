@@ -109,6 +109,7 @@ async def read_current_data(path):
     df.rename(columns=new_column_names, inplace=True)
     
     df['issuer_name'] = df['issuer_name'].str.strip()
+    df['entity_name'] = df['entity_name'].str.strip()
     
     
     return df
@@ -146,14 +147,13 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
 
         if company_name in TRACKED_COMPANIES:
             old_position_data = old_agg_data.loc[old_agg_data['company_name'] == company_name]
-            old_position_percent = old_position_data['position_percent'].iloc[0] if not old_position_data.empty else None
-            time_new_position = agg_new_rows.loc[agg_new_rows['company_name'] == company_name, 'timestamp'].iloc[0]
-
+            # Get the "first" record for the company
+            old_position_percent = old_position_data['position_percent'].iloc[-1] if not old_position_data.empty else None
             change = None
             if old_position_percent is not None:
                 change = new_position_percent - old_position_percent
 
-            description = f"Ändrad blankning: {new_position_percent}%, {time_new_position}"
+            description = f"Ändrad blankning: {new_position_percent}%"
             if change is not None:
                 description += f" ({change:+.2f})" if change > 0 else f" ({change:-.2f})"
 
@@ -165,7 +165,7 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
                     entity_name = holder_row['entity_name']
                     new_holder_percent = holder_row['position_percent']
                     old_holder_data = old_act_data[(old_act_data['entity_name'] == entity_name) & (old_act_data['issuer_name'] == company_name)]
-                    old_holder_percent = old_holder_data['position_percent'].iloc[0] if not old_holder_data.empty else 0
+                    old_holder_percent = old_holder_data['position_percent'].iloc[-1] if not old_holder_data.empty else 0
                     time_holder_position = holder_row['position_date']
                     holder_change = new_holder_percent - old_holder_percent
 

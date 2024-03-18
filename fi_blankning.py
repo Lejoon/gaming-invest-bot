@@ -122,7 +122,7 @@ async def report_error_to_channel(bot, exception):
         error_message = f"An error occurred: {type(exception).__name__}: {exception}"
         await error_channel.send(error_message)
         
-        public_message = "The FI website is currently unresponsive. We will notify you once it's back up."
+        public_message = "Can't fetch the FI short interest files. This message will auto-delete once they are fetched."
         public_msg = await public_channel.send(public_message)
         
         return public_msg  # Return the message object

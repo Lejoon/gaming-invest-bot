@@ -331,9 +331,10 @@ async def update_fi_from_web(db, bot):
             if not web_timestamp:
                 continue
             
-            await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
-            await download_file(session, URLS['DATA_ACT'], FILE_PATHS['DATA_ACT'])
-            try: 
+            try:
+                await download_file(session, URLS['DATA_AGG'], FILE_PATHS['DATA_AGG'])
+                await download_file(session, URLS['DATA_ACT'], FILE_PATHS['DATA_ACT'])
+            
                 new_data_agg = await read_aggregate_data(FILE_PATHS['DATA_AGG'], bot)
                 new_data_act = await read_current_data(FILE_PATHS['DATA_ACT'])
 
@@ -354,8 +355,10 @@ async def update_fi_from_web(db, bot):
             except Exception as e:
                 if error_msg == None:
                     error_msg = await report_error_to_channel(bot, e)
+                    await asyncio.sleep(DELAY_TIME)
                 else:
                     pass
+                    await asyncio.sleep(DELAY_TIME)
 
 async def manual_update(db, bot):
     async with aiohttp_session() as session:

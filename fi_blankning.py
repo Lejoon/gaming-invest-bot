@@ -123,9 +123,6 @@ async def report_error_to_channel(bot, exception):
         await error_channel.send(error_message)
         
         public_message = "Can't fetch the FI short interest files. This message will auto-delete once they are fetched."
-        public_msg = await public_channel.send(public_message)
-        
-        return public_msg  # Return the message object
     else:
         print(f"Could not find channels with IDs {ERROR_ID} and {CHANNEL_ID}")
         
@@ -323,7 +320,6 @@ async def plot_timeseries(daily_data, company_name):
 # Main asynchronous loop to update the database at intervals
 @aiohttp_retry(retries=5, base_delay=5.0, max_delay=120.0)
 async def update_fi_from_web(db, bot):
-    error_msg = None
     while True:
         async with aiohttp_session() as session:
             web_timestamp = await is_timestamp_updated(session)
@@ -345,19 +341,10 @@ async def update_fi_from_web(db, bot):
                 
                 log_message('Database updated with new shorts if any.')
                 
-                # Delete the error message if it exists
-                await delete_error_message(error_msg)
-                error_msg = None
-                
                 await asyncio.sleep(DELAY_TIME)
                 
-                
             except Exception as e:
-                if error_msg == None:
-                    error_msg = await report_error_to_channel(bot, e)
-                    await asyncio.sleep(DELAY_TIME)
-                else:
-                    pass
+                    await report_error_to_channel(bot, e)
                     await asyncio.sleep(DELAY_TIME)
 
 async def manual_update(db, bot):

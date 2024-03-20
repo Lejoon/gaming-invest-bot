@@ -161,7 +161,11 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
             issuer_data = act_new_rows[act_new_rows['issuer_name'] == company_name]
 
             if not issuer_data.empty:
-                holder_description = "\n"
+                if len(issuer_data.iterrows()) == 1:
+                    holder_description = "\n\nÄndrad position över 0.5%:\n"
+                else:
+                    holder_description = "\n\nÄndrade positioner över 0.5%:\n"
+             
                 for _, holder_row in issuer_data.iterrows():
                     entity_name = holder_row['entity_name']
                     new_holder_percent = holder_row['position_percent']
@@ -170,7 +174,7 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
                     time_holder_position = holder_row['position_date']
                     holder_change = new_holder_percent - old_holder_percent
 
-                    holder_description += f"{entity_name}: {new_holder_percent}% ({holder_change:+.2f}), senast uppdaterad {time_holder_position}\n"
+                    holder_description += f"{entity_name}: {new_holder_percent}% ({holder_change:+.2f}), {time_holder_position}\n"
 
                 description += holder_description
             if bot is not None:

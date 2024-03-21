@@ -161,7 +161,7 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
             issuer_data = act_new_rows[act_new_rows['issuer_name'] == company_name]
 
             if not issuer_data.empty:
-                if len(issuer_data.iterrows()) == 1:
+                if len(list(issuer_data.iterrows())) == 1:
                     holder_description = "\n\nÄndrad position över 0.5%:\n"
                 else:
                     holder_description = "\n\nÄndrade positioner över 0.5%:\n"

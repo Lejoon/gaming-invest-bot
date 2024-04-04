@@ -175,7 +175,7 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
                     holder_change = new_holder_percent - old_holder_percent
 
                     if new_holder_percent < 0.5:
-                        holder_description += f"{entity_name}: < 0.5% short percentage since last update ({old_holder_percent:+.2f})\""
+                        holder_description += f"{entity_name}: < 0.5% short percentage since last update ({old_holder_percent:.2f})\n"
                     else:
                         holder_description += f"{entity_name}: {new_holder_percent}% ({holder_change:+.2f}), {time_holder_position}\n"
 

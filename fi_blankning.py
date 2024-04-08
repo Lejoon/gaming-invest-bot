@@ -180,6 +180,7 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
                         holder_description += f"{entity_name}: {new_holder_percent}% ({holder_change:+.2f}), {time_holder_position}\n"
 
                 description += holder_description
+                
             if bot is not None:
                 embed = Embed(
                     title=company_name,
@@ -196,11 +197,13 @@ async def send_embed(old_agg_data, new_agg_data, old_act_data, new_act_data, db,
 
 async def update_position_holders(old_data, new_data, db, fetched_timestamp):
     if old_data.empty:
+        # Insert new data into the database because there's no old data.
         new_data['timestamp'] = fetched_timestamp
         db.insert_bulk_data(input=new_data, table='PositionHolders')
         return
     
     if not new_data.empty:
+        # Adds a time stamp column based on the fetched timestamp date from FI
         new_data['timestamp'] = fetched_timestamp
         
     old_data = old_data.sort_values('timestamp').drop_duplicates(['entity_name', 'issuer_name', 'isin'], keep='last')
@@ -214,11 +217,21 @@ async def update_position_holders(old_data, new_data, db, fetched_timestamp):
     changed_positions = changed_positions[['entity_name', 'issuer_name', 'isin', 'position_percent_x', 'position_date_x']]
     changed_positions.columns = ['entity_name', 'issuer_name', 'isin', 'position_percent', 'position_date']
     
-    # Identify positions that are in the old data but not in the new data
-    dropped_positions = old_data.loc[~old_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1).isin(new_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1))]
+    # Filter old_data to find positions that are not in new_data
+    potential_dropped_positions = old_data.loc[
+    ~old_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1).isin(
+        new_data[['entity_name', 'issuer_name', 'isin']].apply(tuple, 1)
+    )]
+    
+    # Further filter to exclude positions that were already marked as 0.0 before the fetched_timestamp
+    dropped_positions = potential_dropped_positions.loc[
+    (potential_dropped_positions['position_percent'] != 0.0) | 
+    (pd.to_datetime(potential_dropped_positions['timestamp']) >= fetched_timestamp)]
+    
     # Set their position_percent to 0.0
-    dropped_positions['position_percent'] = 0.0
-    dropped_positions['timestamp'] = fetched_timestamp
+    if not dropped_positions.empty:
+        dropped_positions['position_percent'] = 0.0
+        dropped_positions['timestamp'] = fetched_timestamp
     
     new_positions['timestamp'] = fetched_timestamp
     changed_positions['timestamp'] = fetched_timestamp

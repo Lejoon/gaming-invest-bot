@@ -464,7 +464,13 @@ async def short_command(ctx, db, company_name):
 
     daily_data = await create_timeseries(db, company_name)
     image_stream = await plot_timeseries(daily_data, company_name)
-
-    await ctx.send(f'Company: {company_name}, {daily_data.iloc[-1, 0]}% total shorted above with smallest individual position > 0.1%')
-    await ctx.send(file=discord.File(image_stream, filename='plot.png'))
+    
+    # Daily_data can be empty
+    if not daily_data.empty:
+        await ctx.send(f'Company: {company_name}, {daily_data.iloc[-1, 0]}% total shorted above with smallest individual position > 0.1%')
+        await ctx.send(file=discord.File(image_stream, filename='plot.png'))
+        
+    else:
+        await ctx.send(f'Company: {company_name}, no data available.')
+        
 

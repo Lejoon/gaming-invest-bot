@@ -89,6 +89,30 @@ class Database:
         
         rows = self.cursor.fetchall()
         return {appid: place for place, appid in rows}
+    
+    def get_last_week_ranks(self, timestamp, current_top_appids):
+        # Calculate the date for 7 days ago and set the hour to 21
+        last_week_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=7)).strftime('%Y-%m-%d')
+        last_week_timestamp_21 = f"{last_week_date} 21"
+
+        placeholders = ','.join(['?'] * len(current_top_appids))
+        query = f'''
+            SELECT appid, GROUP_CONCAT(place) AS ranks
+            FROM SteamTopGames
+            WHERE timestamp BETWEEN ? AND ? AND appid IN ({placeholders})
+            GROUP BY appid
+        '''
+
+        self.cursor.execute(query, (last_week_timestamp_21, timestamp, *current_top_appids))
+
+        rows = self.cursor.fetchall()
+
+        last_week_ranks = {}
+        for appid, ranks_str in rows:
+            ranks = [int(rank) for rank in ranks_str.split(',')]
+            last_week_ranks[appid] = ranks
+
+        return last_week_ranks
 
     def update_appid(self, appid, title):
         self.cursor.execute("SELECT game_name FROM GameTranslation WHERE appid = ?", (appid,))

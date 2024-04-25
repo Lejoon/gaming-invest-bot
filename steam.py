@@ -133,6 +133,60 @@ async def gts_command(ctx, db: Database):
     joined_response = '\n'.join(response)
     await ctx.send(f"**Top 15 Global Sellers on Steam:**\n{joined_response}")
 
+
+async def gts_weekly_command(ctx, db: Database):
+    top_games = await update_steam_top_sellers(db)
+    latest_timestamp = db.get_latest_timestamp('SteamTopGames')
+    last_week_ranks = db.get_last_week_ranks(latest_timestamp, [game['appid'] for game in top_games[:25]])
+
+    number_of_days = {}
+    # Calculate the 7-day average rank for each game
+    game_avg_ranks_7d = {}
+    for appid, ranks in last_week_ranks.items():
+        game_avg_ranks_7d[appid] = sum(ranks) / len(ranks)
+        number_of_days[appid] = len(ranks)
+
+    # Calculate the 3-day average rank for each game
+    game_avg_ranks_3d = {}
+    for appid, ranks in last_week_ranks.items():
+        game_avg_ranks_3d[appid] = sum(ranks[-3:]) / min(len(ranks), 3)
+
+    # Sort the games based on their 7-day average rank
+    sorted_games = sorted(top_games, key=lambda game: game_avg_ranks_7d.get(game['appid'], float('inf')))
+
+    response = []
+
+    for game in sorted_games[:25]:
+        # Construct the line for each game
+        place = sorted_games.index(game) + 1
+        title = game['title']
+        discount = game['discount']
+        ccu = game['ccu']
+
+        avg_rank_7d = game_avg_ranks_7d.get(game['appid'], None)
+        avg_rank_3d = game_avg_ranks_3d.get(game['appid'], None)
+
+        if avg_rank_7d is not None and avg_rank_3d is not None:
+            # Determine the trend symbol based on the comparison of 3-day and 7-day average ranks
+            if abs(avg_rank_3d - avg_rank_7d) <= 1:
+                trend_symbol = ':small_orange_diamond:'
+            elif avg_rank_3d < avg_rank_7d:
+                trend_symbol = ':small_red_triangle:'
+            else:
+                trend_symbol = ':small_red_triangle_down:'
+                
+            if number_of_days[game['appid']] < 7:
+                trend_symbol = ':new:'
+
+            line = f"{place}. {trend_symbol} {title}"
+        else:
+            line = f"{place}. {title}"
+
+
+        response.append(line)
+
+    joined_response = '\n'.join(response)
+    await ctx.send(f"**Top 25 Global Sellers on Steam, last week average:**\n{joined_response}")
 async def daily_steam_database_refresh(db: Database):
     while True:
         log_time = datetime.now()

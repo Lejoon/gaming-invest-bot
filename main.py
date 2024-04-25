@@ -25,10 +25,27 @@ bot = commands.Bot(command_prefix='!', intents = intents)
 db.create_tables()
 
 # Global Top Sellers command
-from steam import gts_command
+from steam import gts_command, gts_weekly_command
 @bot.command()
 async def gts(ctx):
     await gts_command(ctx, db)
+    
+@bot.command()
+async def gtsweekly(ctx):
+    await gts_weekly_command(ctx, db)
+    
+# Chart command
+from chart import chart_command
+@bot.command()
+async def chart(ctx, *, company_name):
+    await chart_command(ctx, company_name=company_name)
+
+# Chart command
+from chart import report_command
+@bot.command()
+async def reports(ctx, *, company_name):
+    await report_command(ctx, company_name=company_name)
+
 
 # Short seller command
 from fi_blankning import short_command    

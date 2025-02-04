@@ -98,6 +98,68 @@ class Database:
         self.cursor.execute(query)
         return self.cursor.fetchone()[0]
     
+    def get_last_month_placements(self, game_name):
+        """
+        Retrieves aggregated GTS placement data for the given game over the last 30 days.
+        
+        The function:
+         1. Finds the appid for the given game name from the GameTranslation table.
+         2. Queries SteamTopGames for all records with that appid and a timestamp within the last 30 days.
+         3. Aggregates the data by day (using the date portion of the timestamp) and calculates the average placement.
+         4. Returns a dictionary with keys:
+            - "positions": a list of numeric positions for plotting.
+            - "aggregated_labels": a list of date strings corresponding to each position.
+            - "placements": a list of average placement values (as floats) per day.
+        If no data is found for the given game name, returns None.
+        """
+        # Look up the appid using an exact (case-insensitive) match.
+        self.cursor.execute("""
+            SELECT appid FROM GameTranslation
+            WHERE LOWER(game_name) = LOWER(?)
+        """, (game_name,))
+        row = self.cursor.fetchone()
+        if row is None:
+            return None  # No such game found.
+        
+        appid = row[0]
+        
+        # Calculate the threshold timestamp: 30 days ago.
+        from datetime import datetime, timedelta
+        threshold_dt = datetime.now() - timedelta(days=30)
+        threshold_str = threshold_dt.strftime('%Y-%m-%d %H')
+        
+        # Query SteamTopGames for records with this appid from the last 30 days.
+        # We extract the date part (YYYY-MM-DD) from the timestamp (which is stored as "YYYY-MM-DD HH").
+        query = """
+            SELECT substr(timestamp, 1, 10) AS date, AVG(place) AS avg_place
+            FROM SteamTopGames
+            WHERE appid = ? AND timestamp >= ?
+            GROUP BY date
+            ORDER BY date ASC
+        """
+        self.cursor.execute(query, (appid, threshold_str))
+        rows = self.cursor.fetchall()
+        
+        if not rows:
+            return None  # No placement data available for the last 30 days.
+        
+        aggregated_labels = []
+        placements = []
+        positions = []
+        
+        for index, (date_label, avg_place) in enumerate(rows):
+            aggregated_labels.append(date_label)
+            placements.append(avg_place)
+            positions.append(index)
+        
+        aggregated_data = {
+            "positions": positions,
+            "aggregated_labels": aggregated_labels,
+            "placements": placements
+        }
+        
+        return aggregated_data
+    
     def get_yesterday_top_games(self, timestamp, table='SteamTopGames'):
         if table == 'SteamTopGames':
             # Calculate the date for yesterday and set the hour to 21

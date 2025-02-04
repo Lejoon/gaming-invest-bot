@@ -27,8 +27,8 @@ db.create_tables()
 # Global Top Sellers command
 from steam import gts_command, gts_weekly_command
 @bot.command()
-async def gts(ctx):
-    await gts_command(ctx, db)
+async def gts(ctx, *, game_name: str = None):
+    await gts_command(ctx, db, game_name)
     
 @bot.command()
 async def gtsweekly(ctx):

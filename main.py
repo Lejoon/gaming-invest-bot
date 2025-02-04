@@ -46,6 +46,18 @@ from chart import report_command
 async def reports(ctx, *, company_name):
     await report_command(ctx, company_name=company_name)
 
+# Steam command
+from steam_chart import steam_command
+@bot.command()
+async def steam(ctx, *, game_name):
+    await steam_command(ctx, game_name=game_name)
+#    return print("test")
+
+# PS Store command
+from psstore import gtsps_command
+@bot.command()
+async def ps(ctx):
+    await gtsps_command(ctx, db)
 
 # Short seller command
 from fi_blankning import short_command    
@@ -64,6 +76,7 @@ from mfn import websocket_background_task
 from ig import daily_message_morning, daily_message_evening, current_index
 from placera import placera_updates
 from steam import daily_steam_database_refresh
+from psstore import daily_ps_database_refresh
 from fi_blankning import update_fi_from_web
 
 # Initialize the task variables to None
@@ -73,10 +86,11 @@ daily_evening_task = None
 placera_task = None
 steam_task = None
 fi_task = None
+ps_task = None
 
 @bot.event
 async def on_ready():
-    global websocket_task, daily_morning_task, daily_evening_task, placera_task, steam_task, fi_task
+    global websocket_task, daily_morning_task, daily_evening_task, placera_task, steam_task, fi_task, ps_task
 
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
 
@@ -107,6 +121,12 @@ async def on_ready():
     if steam_task is None or steam_task.done():
         print('Start Steam Daily loop')
         steam_task = bot.loop.create_task(daily_steam_database_refresh(db))
+    else:
+        print('Steam Daily loop is already running.')
+
+    if ps_task is None or ps_task.done():
+        print('Start PS Daily loop')
+        steam_task = bot.loop.create_task(daily_ps_database_refresh(db))
     else:
         print('Steam Daily loop is already running.')
 

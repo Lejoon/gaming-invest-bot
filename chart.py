@@ -1,3 +1,10 @@
+import pandas as pd
+from lightweight_charts.widgets import StreamlitChart, JupyterChart
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
+
+
 import requests
 from pydantic import BaseModel, ValidationError, Field
 from typing import List, Optional
@@ -177,10 +184,10 @@ async def get_offhours_data(order_book_id: str):
     {"quote":{"buy":174.8000,"sell":175.0500,"last":174.9000,"highest":175.7500,"lowest":155.0600,"change":18.9000,"changePercent":12.1200,"updated":"2024-04-25T20:05:33.179Z","timeOfLast":"2024-04-25T20:05:33.179Z"},"status":"POST_MARKET"}
     """
     status_code = response["status"]
-    if status_code == "POST_MARKET":
-        return response["quote"]["changePercent"]
+    if status_code == "POST_MARKET" or status_code == "PRE_MARKET":
+        return response["quote"]["changePercent"], response["quote"]["last"] + response["quote"]["change"]
     else:
-        return None
+        return None, None
 
 
 async def get_quotes(order_book_id: str):
@@ -319,6 +326,33 @@ def plot_chart_data(df: pd.DataFrame, title: str):
 
     except Exception as e:
         print(f"Chart error: {e}")
+        
+def plot_light_chart_data(df: pd.DataFrame, title: str, legend: str, lastprice: float):
+    """
+    Plot lightweight chart data
+    """
+    try:
+        # Calculate the MA10, MA50, MA200 at the last time step.
+        
+        chart = StreamlitChart(width=900, height=600)
+
+        chart.watermark(title)
+        chart.legend(visible=True, ohlc=True, text = legend, font_size=14, font_family = 'Monaco')
+        #chart.topbar.textbox('symbol', title)
+        if lastprice:
+            chart.horizontal_line(price=lastprice, style='dotted')
+        
+        chart.set(df)
+        chart.load()
+        html = chart._html
+        html += "</script></body></html>"
+
+        image_stream = render_html_string_to_image(html)
+   
+        return image_stream
+
+    except Exception as e:
+        print(f"Chart error: {e}")
 
 async def report_command(ctx, *, company_name):
     result = await search_avanza(company_name)
@@ -332,7 +366,7 @@ async def report_command(ctx, *, company_name):
     else:
         await ctx.send(f"No hits found.")
     
-async def chart_command(ctx, *, company_name):
+async def chart_command(ctx, *, company_name, test=False):
     result = await search_avanza(company_name)
     order_book_id = ''
     name = ''
@@ -343,14 +377,17 @@ async def chart_command(ctx, *, company_name):
         # Correctly await the asynchronous function here
         chart_data = await get_chart_data(order_book_id, "one_year", Resolution.DAY)
         if chart_data is not None:
-            image = plot_chart_data(chart_data, title=name)
+            legend = ""
+            off_hours_change_percent, off_hours_price = await get_offhours_data(order_book_id)
+            
+            if off_hours_change_percent is not None:
+                legend +=f'Last: {hit.price.last}, off hours: {off_hours_change_percent}%'
+            else:
+                legend +=f'Last: {hit.price.last}'
+                
+            legend += f", MA10: {chart_data['MA10'].iloc[-1]:.1f}, MA50: {chart_data['MA50'].iloc[-1]:.1f}, MA200: {chart_data['MA200'].iloc[-1]:.1f}"
+            image = plot_light_chart_data(chart_data, title=name, legend=legend, lastprice = off_hours_price)
             if image:
-                off_hours = await get_offhours_data(order_book_id)
-                if off_hours is not None:
-                    await ctx.send(f'Company: {name}, last price: {hit.price.last}, off hours: {off_hours}%')
-                else:
-                    await ctx.send(f'Company: {name}, last price: {hit.price.last}')
-                await ctx.send(f"MA10: {chart_data['MA10'].iloc[-1]:.1f}, MA50: {chart_data['MA50'].iloc[-1]:.1f}, MA200: {chart_data['MA200'].iloc[-1]:.1f}\n")
                 await ctx.send(file=discord.File(image, filename='chart_plot.png'))
             else:
                 await ctx.send("Failed to generate chart image.")
@@ -403,10 +440,42 @@ def test_report(query: str):
         print(f"{loop.run_until_complete(get_latest_events(isin))}")
     else:
         print(f"No hits found.")
+        
+        
+def render_html_string_to_image(html_string):
+    # Set up the Chrome driver options for headless mode
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+
+    # Initialize the Chrome driver
+    driver = webdriver.Chrome(options=chrome_options)
+
+    try:
+        # Encode HTML string in base64
+        import base64
+        encoded = base64.b64encode(html_string.encode('utf-8')).decode('utf-8')
+        url = f'data:text/html;base64,{encoded}'
+
+        # Load the HTML content
+        driver.get(url)
+        # Set the window size for screenshot
+        driver.set_window_size(900, 600)
+    
+
+        # Take a screenshot and save it
+        from io import BytesIO
+        image_stream = BytesIO()
+        driver.get_screenshot_as_png()
+        image_stream.write(driver.get_screenshot_as_png())
+        image_stream.seek(0)
+        return image_stream
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
     #testing()
     # Await get_latest_events
     test_report("evolution")
     #bot.run(BOT_TOKEN)
-

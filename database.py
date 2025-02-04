@@ -20,6 +20,14 @@ GAME_TRANSLATION_SCHEMA = '''
             game_name TEXT
         );
         '''
+        
+PS_GAME_TRANSLATION_SCHEMA = '''
+    CREATE TABLE IF NOT EXISTS PSGameTranslation (
+        ps_id INTEGER PRIMARY KEY,
+        game_name TEXT
+    );
+    '''
+
 STEAM_TOP_GAMES_SCHEMA = '''
         CREATE TABLE IF NOT EXISTS SteamTopGames (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,6 +38,17 @@ STEAM_TOP_GAMES_SCHEMA = '''
             ccu INTEGER
         );
         '''
+        
+PS_TOP_GAMES_SCHEMA = '''
+    CREATE TABLE IF NOT EXISTS PSTopGames (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT,
+        place INTEGER,
+        ps_id TEXT,
+        discount TEXT
+    );
+    '''
+
 SHORT_POSITIONS_SCHEMA = '''    
         CREATE TABLE IF NOT EXISTS ShortPositions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,6 +83,8 @@ class Database:
     def create_tables(self):
         self.cursor.execute(GAME_TRANSLATION_SCHEMA)
         self.cursor.execute(STEAM_TOP_GAMES_SCHEMA)
+        self.cursor.execute(PS_TOP_GAMES_SCHEMA)
+        self.cursor.execute(PS_GAME_TRANSLATION_SCHEMA)
         self.cursor.execute(SHORT_POSITIONS_SCHEMA)
         self.cursor.execute(REPORTED_ENTITIES_SCHEMA)
         self.cursor.execute(POSITION_HOLDERS_SCHEMA)
@@ -77,18 +98,32 @@ class Database:
         self.cursor.execute(query)
         return self.cursor.fetchone()[0]
     
-    def get_yesterday_top_games(self, timestamp):
-        # Calculate the date for yesterday and set the hour to 21
-        yesterday_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=1)).strftime('%Y-%m-%d')
-        yesterday_timestamp_21 = f"{yesterday_date} 21"
-        
-        self.cursor.execute('''
-        SELECT place, appid FROM SteamTopGames
-        WHERE timestamp = ?
-        ''', (yesterday_timestamp_21,))
-        
-        rows = self.cursor.fetchall()
-        return {appid: place for place, appid in rows}
+    def get_yesterday_top_games(self, timestamp, table='SteamTopGames'):
+        if table == 'SteamTopGames':
+            # Calculate the date for yesterday and set the hour to 21
+            yesterday_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=1)).strftime('%Y-%m-%d')
+            yesterday_timestamp_21 = f"{yesterday_date} 21"
+            
+            self.cursor.execute('''
+            SELECT place, appid FROM SteamTopGames
+            WHERE timestamp = ?
+            ''', (yesterday_timestamp_21,))
+            
+            rows = self.cursor.fetchall()
+            return {appid: place for place, appid in rows}
+    
+        elif table == 'PSTopGames':
+            # Calculate yesterday's timestamp for the PS table
+            yesterday_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=1)).strftime('%Y-%m-%d')
+            yesterday_timestamp_21 = f"{yesterday_date} 21"
+            
+            self.cursor.execute('''
+                SELECT place, ps_id FROM PSTopGames
+                WHERE timestamp = ?
+            ''', (yesterday_timestamp_21,))
+            
+            rows = self.cursor.fetchall()
+            return {ps_id: place for place, ps_id in rows}
     
     def get_last_week_ranks(self, timestamp, current_top_appids):
         # Calculate the date for 7 days ago and set the hour to 21
@@ -120,6 +155,14 @@ class Database:
             self.cursor.execute("INSERT INTO GameTranslation (appid, game_name) VALUES (?, ?)", (appid, title))
             self.conn.commit()
             
+    def update_ps_appid(self, ps_id, game_name):
+        self.cursor.execute("SELECT game_name FROM PsGameTranslation WHERE ps_id = ?", (ps_id,))
+        result = self.cursor.fetchone()
+        if result is None:
+            self.cursor.execute("INSERT INTO PsGameTranslation (ps_id, game_name) VALUES (?, ?)",
+                              (ps_id, game_name))
+            self.conn.commit()
+            
     def insert_bulk_data(self, input, table='SteamTopGames'):
         ''' 
         Insert multiple rows in a single transaction
@@ -131,6 +174,14 @@ class Database:
             VALUES (?, ?, ?, ?, ?)
             '''
             data = [(game['timestamp'], game['count'], game['appid'], game['discount'], game['ccu']) for game in input]
+
+        elif table == 'PSTopGames':
+            query = '''
+            INSERT INTO PSTopGames (timestamp, place, ps_id, discount)
+            VALUES (?, ?, ?, ?)
+            '''
+            data = [(game['timestamp'], game['place'], game['ps_id'], game['discount']) for game in input]
+
 
         elif table == 'ShortPositions':
             query = '''

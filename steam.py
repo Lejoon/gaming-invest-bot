@@ -116,14 +116,77 @@ def generate_gts_placements_plot(aggregated_data, game_name):
 def get_best_game_match(user_query, db):
     # Fetch all game names from the database.
     cursor = db.conn.execute("SELECT game_name FROM GameTranslation")
+
     game_names = [row[0] for row in cursor.fetchall()]
 
     # Use difflib to find the closest match.
     # n=1 means we only get the best match; cutoff=0.6 means only return matches with a score >= 0.6.
-    matches = difflib.get_close_matches(user_query, game_names, n=1, cutoff=0.6)
+    matches = difflib.get_close_matches(user_query, game_names, n=1, cutoff=0.9)
     if matches:
         return matches[0]
     return None
+
+
+async def update_steam_top_sellers(db: Database) -> dict:
+    url = "https://store.steampowered.com/search/?filter=globaltopsellers"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            html = await response.text()
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    games = []
+    count = 0
+    
+    for game_div in soup.select('.search_result_row')[:50]:
+        appid = game_div['data-ds-appid']
+        title_elements = game_div.select('.title')
+        price_elements = game_div.select('.discount_final_price, .search_price')
+        discount_elements = game_div.select('.discount_pct, .search_price')
+
+        title = title_elements[0].text if title_elements else "Unknown title"
+        discount = discount_elements[0].text.strip() if discount_elements else ""
+        price = price_elements[0].text.strip() if price_elements else ""
+        
+        if price == "Free":
+            discount = "Free"
+        
+        count += 1
+        
+        # Check if the appid already exists in the translation table. If the appid doesn't exist, insert it into the translation table
+        db.update_appid(appid, title)
+
+        timestamp = datetime.now().strftime('%Y-%m-%d %H')
+        
+        # Fetch CCU using Steam API
+        ccu = await fetch_ccu(appid)
+        
+        # Store the data in a dictionary and add it to the games list
+        game_data = {
+            'timestamp': timestamp,
+            'count': count,
+            'appid': appid,
+            'title': title,
+            'discount': discount,
+            'ccu': ccu
+        }
+        games.append(game_data)
+        
+        # Fetch the latest timestamp from the database
+    latest_timestamp = db.get_latest_timestamp('SteamTopGames')
+    
+    if latest_timestamp is not None:
+        latest_timestamp = datetime.strptime(latest_timestamp, '%Y-%m-%d %H')
+
+    # Get the current time (up to the hour)
+    current_time = datetime.now().replace(minute=0, second=0, microsecond=0)
+
+    # If there was an update within the last hour, don't update the database
+    if latest_timestamp is not None and current_time - latest_timestamp < timedelta(hours=1):
+        return games
+
+    db.insert_bulk_data(games)
+    
+    return games
 
 async def gts_command(ctx, db, game_name: str = None):
     """

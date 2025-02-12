@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from general_utils import log_message, error_message
 
 PRESS_RELEASES_CHANNEL = 1163373835886805013
-WEBSOCKET_URL = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="en"))(or(a.industry_id=36)))'
+WEBSOCKET_URL = 'wss://mfn.se/all/s?filter=(and(or(.properties.lang="en"))(or(a.industry_id=36)(query="asmodee group ab")))'
 
 async def fetch_mfn_updates(bot, last_disconnect_time):
     websocket_url = WEBSOCKET_URL

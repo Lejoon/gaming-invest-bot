@@ -22,7 +22,7 @@ def get_icon_from_description(description):
     return key, description, None
 
 # List of companies to track (case insensitive)
-companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Flexion', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront', 'Take-Two', 'Asmodee']
+companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Flexion', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront', 'Take-Two', 'Asmodee', 'ASMODEE']
 
 # Create a deque with a maximum size to store the recently seen articles
 max_queue_size = 1000

@@ -51,7 +51,6 @@ from steam_chart import steam_command
 @bot.command()
 async def steam(ctx, *, game_name):
     await steam_command(ctx, game_name=game_name)
-#    return print("test")
 
 # PS Store command
 from psstore import gtsps_command

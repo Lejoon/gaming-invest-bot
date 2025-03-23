@@ -45,7 +45,7 @@ def generate_gts_placements_plot(aggregated_data, game_name):
     """
     positions = aggregated_data["positions"]
     aggregated_labels = aggregated_data["aggregated_labels"]
-    placements = aggregated_data["placements"]
+    placements = np.round(aggregated_data["placements"]).astype(int)
     
     # Set up plotting parameters.
     rcParams.update({'font.size': 7})
@@ -98,9 +98,8 @@ def generate_gts_placements_plot(aggregated_data, game_name):
     # Annotate each data point with its (rounded) placement value.
     for x, y in zip(positions, placements):
         if np.isfinite(y):
-            rounded_y = int(round(y))
             # With the y-axis inverted and on a log scale, subtract a small offset to place text above the marker.
-            ax.text(x, y - 0.3, f"{rounded_y}", fontsize=6, ha='center', va='bottom')
+            ax.text(x, y - 0.3, f"{y}", fontsize=6, ha='center', va='bottom')
     
     plt.tight_layout()
     

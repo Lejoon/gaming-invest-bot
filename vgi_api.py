@@ -62,7 +62,9 @@ def get_sales_data_steam(game_slug):
         f"{BASE_URL}/game/{game_slug}/sales-summary?"
         "period=Quarter&isAlignedForCumulative=truealse&isAlignedToRelease=false&platforms=steam"
     )
-    return fetch_api(sales_url, f"Failed to retrieve sales data from {sales_url}")
+    # Don't call the API function because the URL is currently 401. Return none
+    return None
+    # return fetch_api(sales_url, f"Failed to retrieve sales data from {sales_url}")
 
 def get_sales_data_playstation(game_slug):
     """Retrieve monthly sales-summary data for the given game slug."""
@@ -70,7 +72,9 @@ def get_sales_data_playstation(game_slug):
         f"{BASE_URL}/game/{game_slug}/sales-summary?"
         "period=Quarter&isAlignedForCumulative=true&isAlignedToRelease=false&platforms=playstation"
     )
-    return fetch_api(sales_url, f"Failed to retrieve sales data from {sales_url}")
+    # Don't call the API function because the URL is currently 401. Return none
+    return None
+    #return fetch_api(sales_url, f"Failed to retrieve sales data from {sales_url}")
 
 
 def get_logos_data(game_slug):

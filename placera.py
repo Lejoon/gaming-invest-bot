@@ -9,120 +9,119 @@ import re
 from general_utils import log_message, error_message
 
 TELEGRAM_CHANNEL = 1167391973825593424
+
 icon_dict = {
     'Finwire': 'https://finwire.com/wp-content/uploads/2021/03/1.5-FINWIRE-Logotype-Bird-Icon-2020-PMS021-300x300.png',
-    'Direkt': 'https://media.licdn.com/dms/image/C560BAQFerUMPTdDrAA/company-logo_200_200/0/1569249859285/nyhetsbyr_n_direkt_logo?e=1706745600&v=beta&t=YUjFmqgCdSjIebxklnaYep7RfaKL9vLhfJdJNBA594Q',
+    'Nyhetsbyrån Direkt': 'https://media.licdn.com/dms/image/C560BAQFerUMPTdDrAA/company-logo_200_200/0/1569249859285/nyhetsbyr_n_direkt_logo?e=1706745600&v=beta&t=YUjFmqgCdSjIebxklnaYep7RfaKL9vLhfJdJNBA594Q',
 }
 
-def get_icon_from_description(description):
-    for key in icon_dict:
-        if key in description:
-            description = re.sub(rf'\({key}\)', '', description).strip()
-            return key, description, icon_dict[key]
-    return key, description, None
+def get_source_icon(src_text):
+    """Strip 'Källa:' and lookup icon."""
+    m = re.match(r'Källa:\s*(.+)', src_text)
+    if not m:
+        return None, None
+    src = m.group(1)
+    return src, icon_dict.get(src)
 
-# List of companies to track (case insensitive)
-companies_to_track = ['Embracer', 'Paradox', 'Ubisoft', 'Starbreeze', 'EG7', 'Flexion', 'Enad Global 7', 'Take Two', 'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'G5', 'Remedy', 'MTG', 'Modern Times Group', 'Rovio', 'Thunderful', 'MGI', 'Electronic Arts', 'Take-Two', 'Stillfront', 'Take-Two', 'Asmodee', 'ASMODEE']
-
-# Create a deque with a maximum size to store the recently seen articles
+# persistence
 max_queue_size = 1000
+seen_file = 'seen_articles.pkl'
+companies_to_track = [
+    'Embracer', 'Paradox', 'Ubisoft', 'Starbreeze',
+    'EG7', 'Flexion', 'Enad Global 7', 'Take Two',
+    'Capcom', 'Maximum Entertainment', 'MAG Interactive',
+    'G5', 'Remedy', 'MTG', 'Modern Times Group',
+    'Rovio', 'Thunderful', 'MGI', 'Electronic Arts',
+    'Take-Two', 'Stillfront', 'Asmodee', 'ASMODEE'
+]
 
-def save_seen_articles():
-    with open('seen_articles.pkl', 'wb') as f:
-        pickle.dump(seen_articles, f)
-
-def load_seen_articles():
+def load_seen():
     try:
-        with open('seen_articles.pkl', 'rb') as f:
-            return pickle.load(f)
+        return pickle.load(open(seen_file,'rb'))
     except FileNotFoundError:
         return deque(maxlen=max_queue_size)
 
-seen_articles = load_seen_articles()
+def save_seen(q):
+    pickle.dump(q, open(seen_file,'wb'))
 
-async def send_to_discord(title, date, url, company, bot):
-    channel = bot.get_channel(TELEGRAM_CHANNEL)
-    
-    if company:
-        title = title.replace(f"{company}:", "").strip()
-    
-    key, description, icon_url = get_icon_from_description(title)
-        
-    timestamp=datetime.strptime(date, "%Y-%m-%d %H:%M")    
-    embed = discord.Embed(title=company, description=description, url=url, timestamp=timestamp)
-    
-    if icon_url:
-        embed.set_footer(text=key, icon_url=icon_url)
+seen_articles = load_seen()
 
-    if channel:
-        await channel.send(embed=embed)
-        # Current time
-        log_message(f'Sent Placera update about {title} to Discord.')
+async def send_to_discord(title, raw_date, url, company, source, icon_url, bot):
+    chan = bot.get_channel(TELEGRAM_CHANNEL)
+    embed = discord.Embed(
+        title=company or 'Placera',
+        description=title,
+        url=url,
+        timestamp=datetime.utcnow()
+    )
+    if source and icon_url:
+        embed.set_footer(text=source, icon_url=icon_url)
+    if chan:
+        await chan.send(embed=embed)
+        log_message(f'Sent "{title}" ({raw_date}) to Discord.')
 
-async def fetch_page(url):
+async def fetch(session, url):
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response.raise_for_status()  # Raise an error for bad responses like 404 or 500
-                return await response.text()
-            
-    except aiohttp.ClientError as e:
-        error_message(f'Placera error occurred: {e}')
-    return None  
+        async with session.get(url) as resp:
+            resp.raise_for_status()
+            return await resp.text()
+    except Exception as e:
+        error_message(f'Fetch error for {url}: {e}')
+        return None
 
+async def check_placera(bot):
+    tabs = ['telegram','pressmeddelande','extern-analys']
+    base = 'https://www.placera.se/telegram?tab={}'
+    delay, max_delay = 60, 600
 
-async def check_for_placera_updates(bot):
-    delay = 60  # Initial delay in seconds
-    max_delay = 600  # Maximum delay in seconds (10 minutes)
+    async with aiohttp.ClientSession() as session:
+        while True:
+            try:
+                for tab in tabs:
+                    html = await fetch(session, base.format(tab))
+                    if not html:
+                        continue
 
-    while True:
-        try:
-            url = 'https://www.placera.se/placera/telegram.html'
-            page_content = await fetch_page(url)
-            
-            if page_content is None:
-                raise Exception("Failed to retrieve content")
+                    soup = BeautifulSoup(html, 'html.parser')
+                    container = soup.select_one('div.w-full.bg-surf-tertiary div.flex.flex-col')
+                    if not container:
+                        error_message(f'No container in {tab}')
+                        continue
 
-        
-            soup = BeautifulSoup(page_content, 'html.parser')
+                    for a in container.find_all('a', href=re.compile(r'^/telegram/')):
+                        href = a['href']
+                        full_url = 'https://www.placera.se' + href
+                        # company
+                        span = a.find('span', class_=re.compile(r'text-\[#'))
+                        company = span.text.strip() if span else None
+                        # raw date text e.g. "Idag, 12:35"
+                        date_p = a.find('p', string=re.compile(r'.+'))
+                        raw_date = date_p.text.strip() if date_p else ''
+                        # title
+                        h5 = a.find('h5')
+                        title = h5.text.strip() if h5 else ''
+                        # source
+                        src_p = a.find_all('p')[-1]
+                        source, icon_url = get_source_icon(src_p.text.strip()) if src_p else (None,None)
 
-            ul_list = soup.find('ul', {'class': 'feedArticleList XSText'})
+                        # dedupe
+                        key = f'{tab}|{raw_date}|{title}'
+                        if key in seen_articles:
+                            continue
 
-            if ul_list is None:
-                raise Exception("Could not find the required ul element. The Placera page structure might have changed.")
+                        # track only your companies
+                        if company and any(tc.lower() in company.lower() for tc in companies_to_track):
+                            await send_to_discord(title, raw_date, full_url, company, source, icon_url, bot)
 
-            for li in ul_list.find_all('li', {'class': 'item'}):
-                a_tag = li.find('a')
-                relative_url = a_tag['href']
-                full_url = f'http://www.placera.se{relative_url}'
-                
-                intro_div = a_tag.find('div', {'class': 'intro'})
-                company_span = intro_div.find('span', {'class': 'bold'})
-                
-                company = company_span.text.strip().rstrip(":") if company_span else None
-                title = intro_div.text.strip()
-                date = li.find('span', {'class': 'date'}).text.strip()
+                        seen_articles.append(key)
+                        save_seen(seen_articles)
 
-                article_id = date + title
-
-                if article_id not in seen_articles:
-                    for tracked_company in companies_to_track:
-                        if company and tracked_company.lower() in company.lower():
-                            log_message(f'Found news item regarding {company}')
-                            await send_to_discord(title, date, full_url, company, bot)
-                            break
-                    
-                    seen_articles.append(article_id)
-                    save_seen_articles()
-                
-                delay = 60  # Reset delay on success
-    
-        except Exception as e:
-            error_message(f'An error occurred while parsing Placera: {e}')
-            delay = min(delay * 2, max_delay)  # Double the delay, up to a maximum
-
-        finally:
-            await asyncio.sleep(delay)  # Sleep for the current del
+                delay = 60
+            except Exception as e:
+                error_message(f'Parser error: {e}')
+                delay = min(delay * 2, max_delay)
+            finally:
+                await asyncio.sleep(delay)
 
 async def placera_updates(bot):
-    await check_for_placera_updates(bot)
+    await check_placera(bot)

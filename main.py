@@ -74,7 +74,8 @@ async def earnings(ctx, *args):
 from mfn import websocket_background_task
 from ig import daily_message_morning, daily_message_evening, current_index
 from placera import placera_updates
-from steam import daily_steam_database_refresh
+from steam import SteamPipeline
+from pipeline import schedule_pipeline
 from psstore import daily_ps_database_refresh
 from fi_blankning import update_fi_from_web
 
@@ -118,16 +119,17 @@ async def on_ready():
         print('Placera telegram loop is already running.')
 
     if steam_task is None or steam_task.done():
-        print('Start Steam Daily loop')
-        steam_task = bot.loop.create_task(daily_steam_database_refresh(db))
+        print('Starting Steam pipeline')
+        steam_pipeline = SteamPipeline(db)
+        steam_task = bot.loop.create_task(schedule_pipeline(steam_pipeline))
     else:
-        print('Steam Daily loop is already running.')
+        print('Steam pipeline is already running.')
 
     if ps_task is None or ps_task.done():
         print('Start PS Daily loop')
-        steam_task = bot.loop.create_task(daily_ps_database_refresh(db))
+        ps_task = bot.loop.create_task(daily_ps_database_refresh(db))
     else:
-        print('Steam Daily loop is already running.')
+        print('PS Daily loop is already running.')
 
     if fi_task is None or fi_task.done():
         print('Start FI Blankning loop')

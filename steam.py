@@ -12,8 +12,7 @@ import discord
 import io
 import difflib
 import numpy as np
-
-
+from pipeline import BasePipeline
 
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
 
@@ -324,3 +323,17 @@ async def daily_steam_database_refresh(db: Database):
         await update_steam_top_sellers(db)
         print('Database updated with Steam top sellers.')
         
+
+class SteamPipeline(BasePipeline):
+    """Pipeline for scraping and storing Steam top sellers."""
+    def __init__(self, db):
+        # uses existing update_steam_top_sellers which handles DB writes
+        super().__init__(name="steam", db=db)
+
+    async def fetch(self):
+        # fetch and store inside update_steam_top_sellers
+        return await update_steam_top_sellers(self.db)
+
+    async def store(self, items):
+        # skip BasePipeline.store since update_steam_top_sellers already wrote to DB
+        return items

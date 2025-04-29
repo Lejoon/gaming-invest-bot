@@ -4,7 +4,8 @@ import discord
 from bs4 import BeautifulSoup
 import asyncio
 from datetime import datetime
-# Assuming these utility functions exist for logging
+# Assuming these utility functions exist and are imported
+# Note: error_message is now async
 from general_utils import log_message, error_message
 
 # --- Configuration Constants ---
@@ -24,7 +25,7 @@ FAST_RECONNECT_DELAY_SECONDS = 1
 
 # --- Core Websocket Function ---
 
-async def fetch_mfn_updates(bot):
+async def fetch_mfn_updates(bot: discord.Client): # Added type hint for bot
     """
     Connects to the MFN websocket, listens for messages, parses them,
     and sends updates to a Discord channel. Handles keep-alive automatically.
@@ -44,8 +45,6 @@ async def fetch_mfn_updates(bot):
         while True:
             try:
                 # Wait for a message from the websocket.
-                # websockets library handles ping/pong in the background.
-                # If a ping timeout occurs, this will raise ConnectionClosedError.
                 message = await ws.recv()
 
                 # --- Parse the HTML message ---
@@ -58,30 +57,29 @@ async def fetch_mfn_updates(bot):
                 item_link = soup.find("a", class_="title-link item-link")
 
                 if not all([date_span, time_span, author_link, item_link]):
-                    error_message(f"Could not parse all required elements from MFN message: {message[:200]}...") # Log snippet
+                    # *** CHANGED: Added await and passed bot ***
+                    await error_message(bot, f"Could not parse all required elements from MFN message: {message[:200]}...") # Log snippet
                     continue # Skip this message if essential parts are missing
 
                 date_str = date_span.text
                 time_str = time_span.text[:-3] # Remove milliseconds
                 author_name = author_link.text
-                # author_url = author_link.get('href') # .get() is safer than ['href']
                 item_title = item_link.text
                 item_href = item_link.get('href')
 
                 if not item_href:
-                     error_message(f"Missing href in item link for message: {message[:200]}...")
+                     # *** CHANGED: Added await and passed bot ***
+                     await error_message(bot, f"Missing href in item link for message: {message[:200]}...")
                      continue # Skip if the link URL is missing
 
                 title_url = f"http://www.mfn.se{item_href}" # Construct full URL
-
-                # Removed the per-message log to reduce spam:
-                # log_message(f'Fetched news {item_title} from MFN')
 
                 # --- Prepare and Send Discord Embed ---
                 try:
                     timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
                 except ValueError as time_e:
-                    error_message(f"Error parsing date/time '{date_str} {time_str}': {time_e}")
+                    # *** CHANGED: Added await and passed bot ***
+                    await error_message(bot, f"Error parsing date/time '{date_str} {time_str}': {time_e}")
                     timestamp = datetime.now() # Fallback to current time
 
                 embed = discord.Embed(
@@ -94,28 +92,35 @@ async def fetch_mfn_updates(bot):
 
                 channel = bot.get_channel(PRESS_RELEASES_CHANNEL)
                 if channel:
-                    await channel.send(embed=embed)
+                    try:
+                        await channel.send(embed=embed)
+                    except discord.errors.Forbidden:
+                        # *** CHANGED: Added await and passed bot ***
+                        await error_message(bot, f"Bot lacks permissions to send messages in channel {PRESS_RELEASES_CHANNEL}.")
+                    except Exception as send_e:
+                        # *** CHANGED: Added await and passed bot ***
+                        await error_message(bot, f"Failed to send embed to channel {PRESS_RELEASES_CHANNEL}: {send_e}")
                 else:
                     # Log if the channel isn't found (might happen during startup or if ID is wrong)
-                    error_message(f"Could not find Discord channel with ID: {PRESS_RELEASES_CHANNEL}")
+                    # *** CHANGED: Added await and passed bot ***
+                    await error_message(bot, f"Could not find Discord channel with ID: {PRESS_RELEASES_CHANNEL}")
                 # --- End Discord Send ---
 
             except websockets.exceptions.ConnectionClosed as e:
                 # Log specific closure reason if available (includes ping timeouts)
-                # This log message is now more informative before raising
                 log_message(f"Websocket connection closed inside fetch_mfn_updates: Code={e.code}, Reason='{e.reason}'. Raising exception.")
                 raise e # Re-raise to signal the outer loop to reconnect, passing the exception object
 
             except Exception as e:
                 # Catch unexpected errors during message processing (parsing, Discord API issues, etc.)
-                error_message(f"Error processing MFN message or sending to Discord: {e}")
-                # Depending on the error, you might want to add more specific handling.
+                # *** CHANGED: Added await and passed bot ***
+                await error_message(bot, f"Error processing MFN message or sending to Discord: {e}")
                 # For robustness, re-raising to trigger a reconnect is often the safest default.
                 raise e # Re-raise to trigger reconnect by the outer loop, passing the exception object
 
 # --- Background Task for Connection Management ---
 
-async def websocket_background_task(bot):
+async def websocket_background_task(bot: discord.Client): # Added type hint for bot
     """
     Manages the websocket connection lifecycle, including reconnections
     with exponential backoff for most errors, and handles specific
@@ -144,20 +149,23 @@ async def websocket_background_task(bot):
                 wait_time = FAST_RECONNECT_DELAY_SECONDS # Use the short, fixed delay
             else:
                 # Handle all other connection closures with backoff
-                error_message(f"Connection closed (Code={e.code}, Reason='{e.reason}'). Incrementing backoff counter. Attempt {attempt_count + 1}.")
+                # *** CHANGED: Added await and passed bot ***
+                await error_message(bot, f"Connection closed (Code={e.code}, Reason='{e.reason}'). Incrementing backoff counter. Attempt {attempt_count + 1}.")
                 attempt_count += 1
                 # Calculate wait time using exponential backoff
                 wait_time = min(2 ** attempt_count, MAX_RECONNECT_WAIT_SECONDS)
 
         except (websockets.exceptions.InvalidHandshake, websockets.exceptions.WebSocketException) as e:
             # Handle specific websocket connection errors with backoff
-            error_message(f"Websocket connection error: {type(e).__name__}. Incrementing backoff counter. Attempt {attempt_count + 1}.")
+            # *** CHANGED: Added await and passed bot ***
+            await error_message(bot, f"Websocket connection error: {type(e).__name__}. Incrementing backoff counter. Attempt {attempt_count + 1}.")
             attempt_count += 1
             wait_time = min(2 ** attempt_count, MAX_RECONNECT_WAIT_SECONDS) # Calculate wait time
 
         except Exception as e:
             # Catch any other unexpected errors from connect() or fetch_mfn_updates() with backoff
-            error_message(f"Unhandled error in websocket task: {e}. Incrementing backoff counter. Attempt {attempt_count + 1}.")
+            # *** CHANGED: Added await and passed bot ***
+            await error_message(bot, f"Unhandled error in websocket task: {e}. Incrementing backoff counter. Attempt {attempt_count + 1}.")
             attempt_count += 1
             wait_time = min(2 ** attempt_count, MAX_RECONNECT_WAIT_SECONDS) # Calculate wait time
 
@@ -166,11 +174,8 @@ async def websocket_background_task(bot):
         if wait_time > LOG_DELAY_THRESHOLD_SECONDS:
              log_message(f"Delaying MFN websocket reconnect attempt by {wait_time} seconds (backoff active)...")
         elif wait_time == FAST_RECONNECT_DELAY_SECONDS:
-             # Optional: Log the fast reconnect delay if you want confirmation
-             # log_message(f"Waiting {wait_time}s before fast reconnect...")
              pass # Default: Don't log the very short fast reconnect delay
         else:
-             # Optional: Log other short delays if needed
              pass # Default: Don't log other very short delays
 
         # Wait before the next connection attempt

@@ -116,15 +116,10 @@ async def read_current_data(path):
 
 async def report_error_to_channel(bot, exception):
     error_channel = bot.get_channel(ERROR_ID)
-    public_channel = bot.get_channel(CHANNEL_ID)
     
-    if error_channel and public_channel:
+    if error_channel:
         await error_message(f"An error occurred: {type(exception).__name__}: {exception}", bot)
-        
-        public_message = "Can't fetch the FI short interest files. This message will auto-delete once they are fetched."
-    else:
-        print(f"Could not find channels with IDs {ERROR_ID} and {CHANNEL_ID}")
-        
+                
 async def delete_error_message(message):
     if message:
         try:

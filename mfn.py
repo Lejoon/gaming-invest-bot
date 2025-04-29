@@ -16,9 +16,11 @@ WEBSOCKET_URL = 'wss://mfn.se/all/?filter=(and(or(.properties.lang="en"))(or(a.i
 PING_INTERVAL_SECONDS = 30  # Send a ping every 30 seconds to keep connection alive
 PING_TIMEOUT_SECONDS = 10   # If no pong reply received within 10 seconds, assume connection is lost
 # Reconnection backoff settings
-MAX_RECONNECT_WAIT_SECONDS = 60 # Maximum time to wait between reconnection attempts
+MAX_RECONNECT_WAIT_SECONDS = 60 # Maximum time to wait between reconnection attempts for general errors
 # Log delay message only if wait time is longer than this (to reduce noise for quick retries)
 LOG_DELAY_THRESHOLD_SECONDS = 4
+# Specific delay for the server-indicated "fast reconnect"
+FAST_RECONNECT_DELAY_SECONDS = 1
 
 # --- Core Websocket Function ---
 
@@ -100,28 +102,31 @@ async def fetch_mfn_updates(bot):
 
             except websockets.exceptions.ConnectionClosed as e:
                 # Log specific closure reason if available (includes ping timeouts)
-                log_message(f"Websocket connection closed: Code={e.code}, Reason='{e.reason}'.")
-                raise # Re-raise to signal the outer loop to reconnect
+                # This log message is now more informative before raising
+                log_message(f"Websocket connection closed inside fetch_mfn_updates: Code={e.code}, Reason='{e.reason}'. Raising exception.")
+                raise e # Re-raise to signal the outer loop to reconnect, passing the exception object
 
             except Exception as e:
                 # Catch unexpected errors during message processing (parsing, Discord API issues, etc.)
                 error_message(f"Error processing MFN message or sending to Discord: {e}")
                 # Depending on the error, you might want to add more specific handling.
                 # For robustness, re-raising to trigger a reconnect is often the safest default.
-                raise # Re-raise to trigger reconnect by the outer loop
+                raise e # Re-raise to trigger reconnect by the outer loop, passing the exception object
 
 # --- Background Task for Connection Management ---
 
 async def websocket_background_task(bot):
     """
     Manages the websocket connection lifecycle, including reconnections
-    with exponential backoff.
+    with exponential backoff for most errors, and handles specific
+    close codes like 'fast reconnect' differently.
     """
-    attempt_count = 0
+    attempt_count = 0 # Counter for backoff calculation for general errors
     while True:
+        wait_time = 0 # Initialize wait time for this loop iteration
         try:
             # Log connection attempt
-            log_message(f"Attempting MFN websocket connection (try #{attempt_count + 1})...")
+            log_message(f"Attempting MFN websocket connection (try #{attempt_count + 1} for general errors)...")
             # Start the main fetch loop. This runs until an exception occurs.
             await fetch_mfn_updates(bot)
 
@@ -129,31 +134,44 @@ async def websocket_background_task(bot):
             # it indicates an unexpected state. Log it and reset attempts.
             log_message("WARNING: fetch_mfn_updates exited loop unexpectedly. Resetting connection.")
             attempt_count = 0 # Reset attempts as it might have been a temporary issue resolved?
+            wait_time = 1 # Wait a short time before trying again even in this weird case
 
         except websockets.exceptions.ConnectionClosed as e:
-            # Logged within fetch_mfn_updates, could add context here if needed
-            error_message(f"Connection closed signal received by background task. Attempt {attempt_count + 1}.")
-            attempt_count += 1
+            # Check for the specific "fast reconnect" code
+            if e.code == 3000:
+                log_message(f"Received 'fast reconnect' signal (Code=3000). Reconnecting shortly.")
+                # Don't increment attempt_count for fast reconnects
+                wait_time = FAST_RECONNECT_DELAY_SECONDS # Use the short, fixed delay
+            else:
+                # Handle all other connection closures with backoff
+                error_message(f"Connection closed (Code={e.code}, Reason='{e.reason}'). Incrementing backoff counter. Attempt {attempt_count + 1}.")
+                attempt_count += 1
+                # Calculate wait time using exponential backoff
+                wait_time = min(2 ** attempt_count, MAX_RECONNECT_WAIT_SECONDS)
+
         except (websockets.exceptions.InvalidHandshake, websockets.exceptions.WebSocketException) as e:
-            # Handle specific websocket connection errors
-            error_message(f"Websocket connection error: {type(e).__name__}. Attempt {attempt_count + 1}.")
+            # Handle specific websocket connection errors with backoff
+            error_message(f"Websocket connection error: {type(e).__name__}. Incrementing backoff counter. Attempt {attempt_count + 1}.")
             attempt_count += 1
+            wait_time = min(2 ** attempt_count, MAX_RECONNECT_WAIT_SECONDS) # Calculate wait time
+
         except Exception as e:
-            # Catch any other unexpected errors from connect() or fetch_mfn_updates()
-            error_message(f"Unhandled error in websocket task: {e}. Attempt {attempt_count + 1}.")
+            # Catch any other unexpected errors from connect() or fetch_mfn_updates() with backoff
+            error_message(f"Unhandled error in websocket task: {e}. Incrementing backoff counter. Attempt {attempt_count + 1}.")
             attempt_count += 1
+            wait_time = min(2 ** attempt_count, MAX_RECONNECT_WAIT_SECONDS) # Calculate wait time
 
-        # --- Reconnection Logic ---
-        # Calculate wait time using exponential backoff, capped at the max wait time
-        wait_time = min(2 ** attempt_count, MAX_RECONNECT_WAIT_SECONDS)
-
-        # Log the delay only if it's longer than the threshold to avoid spamming logs
+        # --- Reconnection Delay ---
+        # Log the delay only if it's longer than the threshold (and not the fast reconnect)
         if wait_time > LOG_DELAY_THRESHOLD_SECONDS:
-             log_message(f"Delaying MFN websocket reconnect attempt by {wait_time} seconds...")
+             log_message(f"Delaying MFN websocket reconnect attempt by {wait_time} seconds (backoff active)...")
+        elif wait_time == FAST_RECONNECT_DELAY_SECONDS:
+             # Optional: Log the fast reconnect delay if you want confirmation
+             # log_message(f"Waiting {wait_time}s before fast reconnect...")
+             pass # Default: Don't log the very short fast reconnect delay
         else:
-             # Optional: Log even short delays if you prefer more verbosity
-             # log_message(f"Short delay before MFN reconnect attempt: {wait_time}s")
-             pass # Default: Don't log very short delays
+             # Optional: Log other short delays if needed
+             pass # Default: Don't log other very short delays
 
         # Wait before the next connection attempt
         await asyncio.sleep(wait_time)

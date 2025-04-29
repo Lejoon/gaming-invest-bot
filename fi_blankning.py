@@ -32,7 +32,7 @@ TRACKED_COMPANIES = set([
     'Embracer Group AB', 'Paradox Interactive AB (publ)', 'Starbreeze AB',
     'EG7', 'Enad Global 7', 'Maximum Entertainment', 'MAG Interactive',
     'G5 Entertainment AB (publ)', 'Modern Times Group MTG AB', 'Thunderful',
-    'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)'
+    'MGI - Media and Games Invest SE', 'Stillfront Group AB (publ)', 'Asmodee Group AB'
 ])
 
 @asynccontextmanager

@@ -119,8 +119,7 @@ async def report_error_to_channel(bot, exception):
     public_channel = bot.get_channel(CHANNEL_ID)
     
     if error_channel and public_channel:
-        error_message = f"An error occurred: {type(exception).__name__}: {exception}"
-        await error_channel.send(error_message)
+        await error_message(f"An error occurred: {type(exception).__name__}: {exception}", bot)
         
         public_message = "Can't fetch the FI short interest files. This message will auto-delete once they are fetched."
     else:

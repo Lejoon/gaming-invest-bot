@@ -66,7 +66,7 @@ async def fetch(session, url):
             resp.raise_for_status()
             return await resp.text()
     except Exception as e:
-        error_message(f'Fetch error for {url}: {e}')
+        await error_message(f'Fetch error for {url}: {e}')
         return None
 
 async def check_placera(bot):
@@ -85,7 +85,7 @@ async def check_placera(bot):
                     soup = BeautifulSoup(html, 'html.parser')
                     container = soup.select_one('div.w-full.bg-surf-tertiary div.flex.flex-col')
                     if not container:
-                        error_message(f'No container in {tab}')
+                        await error_message(f'No container in {tab}', bot)
                         continue
 
                     for a in container.find_all('a', href=re.compile(r'^/telegram/')):
@@ -118,7 +118,7 @@ async def check_placera(bot):
 
                 delay = 60
             except Exception as e:
-                error_message(f'Parser error: {e}')
+                await error_message(f'Parser error: {e}', bot)
                 delay = min(delay * 2, max_delay)
             finally:
                 await asyncio.sleep(delay)

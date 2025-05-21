@@ -126,64 +126,93 @@ def get_best_game_match(user_query, db):
 
 
 async def update_steam_top_sellers(db: Database) -> dict:
-    url = "https://store.steampowered.com/search/?filter=globaltopsellers"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            html = await response.text()
-    soup = BeautifulSoup(html, 'html.parser')
-    
-    games = []
-    count = 0
-    
-    for game_div in soup.select('.search_result_row')[:50]:
-        appid = game_div['data-ds-appid']
-        title_elements = game_div.select('.title')
-        price_elements = game_div.select('.discount_final_price, .search_price')
-        discount_elements = game_div.select('.discount_pct, .search_price')
+    # Phase 1: paginate and collect metadata (no CCU or DB writes)
+    preliminary = []
+    current_rank = 0
+    latest_ts = db.get_latest_timestamp('SteamTopGames')
+    latest_dt = None
+    if latest_ts:
+        latest_dt = datetime.strptime(latest_ts, '%Y-%m-%d %H')
+    now_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
 
-        title = title_elements[0].text if title_elements else "Unknown title"
-        discount = discount_elements[0].text.strip() if discount_elements else ""
-        price = price_elements[0].text.strip() if price_elements else ""
-        
-        if price == "Free":
-            discount = "Free"
-        
-        count += 1
-        
-        # Check if the appid already exists in the translation table. If the appid doesn't exist, insert it into the translation table
+    async with aiohttp.ClientSession() as session:
+        for page in range(5):
+            start = page * 100
+            url = (
+                "https://store.steampowered.com/search/results/"
+                f"?query&start={start}&count=100&dynamic_data=&sort_by=_ASC"
+                "&supportedlang=english&snr=1_7_7_globaltopsellers_7"
+                "&filter=globaltopsellers&infinite=1"
+            )
+            try:
+                async with session.get(url) as resp:
+                    resp.raise_for_status()
+                    html = (await resp.json()).get("results_html", "")
+            except Exception as e:
+                error_message(f"Steam page {page+1} fetch error: {e}")
+                if page < 4: await asyncio.sleep(0.1)
+                continue
+
+            soup = BeautifulSoup(html, 'html.parser')
+            for d in soup.select('.search_result_row'):
+                appid = d.get('data-ds-appid')
+                if not appid:
+                    continue
+                title = d.select_one('.title').text.strip() if d.select_one('.title') else "Unknown"
+                disc = d.select_one('.discount_pct')
+                price = d.select_one('.discount_final_price, .search_price')
+                discount = disc.text.strip() if disc else ("Free" if price and "free" in price.text.lower() else "")
+                current_rank += 1
+                preliminary.append({
+                    'rank': current_rank,
+                    'appid': appid,
+                    'title': title,
+                    'discount': discount
+                })
+            if page < 4:
+                await asyncio.sleep(0.1)
+
+    if not preliminary:
+        log_message("No top-seller metadata fetched.")
+        return []
+
+    # Phase 2: update translations once per unique appid/title
+    for appid, title in {(g['appid'], g['title']) for g in preliminary}:
         db.update_appid(appid, title)
 
-        timestamp = datetime.now().strftime('%Y-%m-%d %H')
-        
-        # Fetch CCU using Steam API
-        ccu = await fetch_ccu(appid)
-        
-        # Store the data in a dictionary and add it to the games list
-        game_data = {
-            'timestamp': timestamp,
-            'count': count,
-            'appid': appid,
-            'title': title,
-            'discount': discount,
-            'ccu': ccu
+    # Phase 3: fetch CCU concurrently
+    appids = list({g['appid'] for g in preliminary})
+    tasks = [fetch_ccu(a) for a in appids]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    ccu_map = {
+        appid: (res if not isinstance(res, Exception) else 0)
+        for appid, res in zip(appids, results)
+    }
+
+    # Phase 4: assemble final games list
+    ts = datetime.now().strftime('%Y-%m-%d %H')
+    games = [
+        {
+            'timestamp': ts,
+            'count': g['rank'],
+            'appid': g['appid'],
+            'title': g['title'],
+            'discount': g['discount'],
+            'ccu': ccu_map.get(g['appid'], 0)
         }
-        games.append(game_data)
-        
-        # Fetch the latest timestamp from the database
-    latest_timestamp = db.get_latest_timestamp('SteamTopGames')
-    
-    if latest_timestamp is not None:
-        latest_timestamp = datetime.strptime(latest_timestamp, '%Y-%m-%d %H')
+        for g in preliminary
+    ]
 
-    # Get the current time (up to the hour)
-    current_time = datetime.now().replace(minute=0, second=0, microsecond=0)
-
-    # If there was an update within the last hour, don't update the database
-    if latest_timestamp is not None and current_time - latest_timestamp < timedelta(hours=1):
+    # Phase 5: conditional DB insert
+    if latest_dt and (now_hour - latest_dt) < timedelta(hours=1):
+        log_message(f"Recent update at {latest_ts}, skipping DB write.")
         return games
 
-    db.insert_bulk_data(games)
-    
+    if games:
+        db.insert_bulk_data(games)
+        log_message(f"Inserted {len(games)} SteamTopGames records.")
+    else:
+        log_message("No games to insert after processing.")
     return games
 
 async def gts_command(ctx, db, game_name: str = None):
@@ -256,6 +285,7 @@ async def gts_command(ctx, db, game_name: str = None):
         response_lines.append(line)
     
     joined_response = '\n'.join(response_lines)
+    
     await ctx.send(f"**Top 15 Global Sellers on Steam:**\n{joined_response}")
     
 async def gts_weekly_command(ctx, db: Database):
@@ -337,3 +367,15 @@ class SteamPipeline(BasePipeline):
     async def store(self, items):
         # skip BasePipeline.store since update_steam_top_sellers already wrote to DB
         return items
+
+if __name__ == "__main__":
+    # For testing outside of a bot context:
+    db = Database("steam_top_games.db")
+    class DummyContext:
+        async def send(self, message):
+            print(message)
+    dummy_ctx = DummyContext()
+    
+    # Test the update_steam_top_sellers function and print its result
+    result = asyncio.run(update_steam_top_sellers(db))
+    print(result)

@@ -125,7 +125,7 @@ def get_best_game_match(user_query, db):
     return None
 
 
-async def update_steam_top_sellers(db: Database) -> dict:
+async def update_steam_top_sellers(db: Database, write_db: bool = True) -> dict:
     # Phase 1: paginate and collect metadata (no CCU or DB writes)
     preliminary = []
     current_rank = 0
@@ -209,8 +209,11 @@ async def update_steam_top_sellers(db: Database) -> dict:
         return games
 
     if games:
-        db.insert_bulk_data(games)
-        log_message(f"Inserted {len(games)} SteamTopGames records.")
+        if write_db:
+            db.insert_bulk_data(games)
+            log_message(f"Inserted {len(games)} SteamTopGames records.")
+        else:
+            log_message(f"Fetched {len(games)} SteamTopGames records (no DB write).")
     else:
         log_message("No games to insert after processing.")
     return games
@@ -246,7 +249,7 @@ async def gts_command(ctx, db, game_name: str = None):
         else:
             return str(ccu)
 
-    top_games = await update_steam_top_sellers(db)
+    top_games = await update_steam_top_sellers(db, write_db=False)
     latest_timestamp = db.get_latest_timestamp('SteamTopGames')
     yesterday_games = db.get_yesterday_top_games(latest_timestamp)
     
@@ -289,7 +292,7 @@ async def gts_command(ctx, db, game_name: str = None):
     await ctx.send(f"**Top 15 Global Sellers on Steam:**\n{joined_response}")
     
 async def gts_weekly_command(ctx, db: Database):
-    top_games = await update_steam_top_sellers(db)
+    top_games = await update_steam_top_sellers(db, write_db=False)
     latest_timestamp = db.get_latest_timestamp('SteamTopGames')
     last_week_ranks = db.get_last_week_ranks(latest_timestamp, [game['appid'] for game in top_games[:25]])
 

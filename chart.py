@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 
 import requests
 from pydantic import BaseModel, ValidationError, Field
-from typing import List, Optional
+from typing import List, Optional, Union
 from enum import Enum
 from time import sleep
 import pandas as pd
@@ -139,6 +139,37 @@ class Period(str, Enum):
     FIVE_Y = "five_years"
     ALL = "infinity"    
     
+def parse_period_str(period_str: str) -> Optional[Period]:
+    if not period_str:
+        return None
+    try:
+        # Attempt direct mapping for simple cases like "ytd", "all"
+        if period_str.lower() == "ytd":
+            return Period.YTD
+        elif period_str.lower() == "all":
+            return Period.ALL
+        
+        # Handle cases like "1d", "1w", "1m", "3m", "1y", "3y", "5y"
+        # Convert to uppercase and replace last character if it's a letter (D, W, M, Y) with underscore version
+        # e.g., "1d" -> "ONE_D", "1w" -> "ONE_W"
+        mapping = {
+            "1d": Period.ONE_D,
+            "1w": Period.ONE_W,
+            "1m": Period.ONE_M,
+            "3m": Period.THREE_M,
+            "1y": Period.ONE_Y,
+            "3y": Period.THREE_Y,
+            "5y": Period.FIVE_Y,
+        }
+        period_enum = mapping.get(period_str.lower())
+        if period_enum:
+            return period_enum
+        
+        # Fallback for other direct enum names if any (e.g. "TODAY")
+        return Period[period_str.upper()]
+    except KeyError:
+        return None
+
 async def get_isin(order_book_id: str):
     url = f"https://www.avanza.se/_api/market-guide/stock/{order_book_id}"
     headers = {'Content-Type': 'application/json'}
@@ -447,16 +478,35 @@ async def report_command(ctx, *, company_name):
     else:
         await ctx.send(f"No hits found.")
     
-async def chart_command(ctx, *, company_name, test=False):
+async def chart_command(ctx, *, company_name, period: Optional[Union[str, Period]] = None, test=False):
     result = await search_avanza(company_name)
     order_book_id = ''
     name = ''
+
+    user_provided_period_enum: Optional[Period] = None
+    if isinstance(period, str):
+        user_provided_period_enum = parse_period_str(period)
+        if user_provided_period_enum is None:
+            await ctx.send(f"Invalid period: {period}. Valid periods are: 1d, 1w, 1m, 3m, ytd, 1y, 3y, 5y, all.")
+            return
+    elif isinstance(period, Period):
+        user_provided_period_enum = period
+    
+    # Determine the final period to use for the API call.
+    # Default to ONE_Y if no valid period was provided by the user.
+    final_api_period_enum = user_provided_period_enum if user_provided_period_enum is not None else Period.ONE_Y
+    
+    # The resolution is kept as Resolution.DAY as per existing logic for this command.
+    final_api_resolution_enum = Resolution.DAY 
+
     if result:
         hit = result.hits[0]
         order_book_id = hit.orderBookId
         name = hit.title
-        # Correctly await the asynchronous function here
-        chart_data = await get_chart_data(order_book_id, "one_year", Resolution.DAY)
+        
+        # Call get_chart_data with the determined period's string value and resolution.
+        chart_data = await get_chart_data(order_book_id, final_api_period_enum.value, final_api_resolution_enum)
+        
         if chart_data is not None:
             legend = ""
             off_hours_change_percent, off_hours_price = await get_offhours_data(order_book_id)

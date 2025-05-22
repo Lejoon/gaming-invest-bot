@@ -35,10 +35,14 @@ async def gtsweekly(ctx):
     await gts_weekly_command(ctx, db)
     
 # Chart command
-from chart import chart_command
+from chart import chart_command, parse_period_str # Updated import
 @bot.command()
-async def chart(ctx, *, company_name):
-    await chart_command(ctx, company_name=company_name)
+async def chart(ctx, company_name: str, period_str: str = None):
+    period_enum = parse_period_str(period_str) # Use the new parsing function
+    if period_str and period_enum is None:
+        await ctx.send(f"Invalid period: {period_str}. Valid periods are: 1d, 1w, 1m, 3m, ytd, 1y, 3y, 5y, all.")
+        return
+    await chart_command(ctx, company_name=company_name, period=period_enum)
 
 # Chart command
 from chart import report_command

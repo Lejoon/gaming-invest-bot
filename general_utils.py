@@ -5,7 +5,7 @@ import aiohttp
 import discord
 
 def log_message(message):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f'[LOG] {timestamp} - {message}')
     
 ERROR_ID = 1162053416290361516 # Define your error channel ID
@@ -15,7 +15,7 @@ async def error_message(message: str, bot: discord.Client | None = None):
     Logs an error message to the console and, if a bot object is provided,
     attempts to send it to a specific Discord channel.
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Added seconds for more precision
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[ERR] {timestamp} - {message}"
     print(log_entry) # Always print to console
 

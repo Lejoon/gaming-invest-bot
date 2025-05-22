@@ -80,7 +80,7 @@ from psstore import daily_ps_database_refresh
 from fi_blankning import update_fi_from_web
 
 # Import and initialize Avanza session
-from avanza_auth import get_avanza_session
+from avanzaauth import get_avanza_session
 
 # Initialize the task variables to None
 websocket_task = None

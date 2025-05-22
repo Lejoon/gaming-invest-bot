@@ -170,60 +170,28 @@ async def check_placera(bot, verbose=False):
                     soup = BeautifulSoup(html, 'html.parser')
                     
                     list_items = [] # This will store the final <a> tags to be processed
-                    container_found = False
 
-                    # Attempt 1: Find a known container and then items within it
-                    container_selectors = [
-                        'ul.list.list--links',
-                        'div.feed.list.list--links',
-                        'div.w-full.bg-surf-tertiary div.flex.flex-col'
-                    ]
-                    for sel in container_selectors:
-                        container = soup.select_one(sel)
-                        if container:
-                            container_found = True
-                            # Try to find <li> items first, then extract <a> from them matching the pattern
-                            li_elements = container.select('li.feed__list-item')
-                            for li_item in li_elements:
-                                a_tag_in_li = li_item.find('a', href=current_href_pattern)
-                                if a_tag_in_li:
-                                    list_items.append(a_tag_in_li)
-                            
-                            # If no <a> tags found via <li>s, try finding <a> directly in container matching the pattern
-                            if not list_items: # Only if <li> search yielded nothing
-                                a_tags_in_container = container.find_all('a', href=current_href_pattern)
-                                list_items.extend(a_tags_in_container)
-
-                            if list_items: # Found items via container
-                                if verbose: print(f"[verbose] Found {len(list_items)} items via container selector '{sel}' using pattern '{current_href_pattern.pattern}' for tab '{tab}'")
-                                break 
+                    # Directly perform global search for <a> tags matching the pattern
+                    if verbose: print(f"[verbose] Performing global search for <a> tags with pattern '{current_href_pattern.pattern}' for tab '{tab}'.")
+                    candidate_a_tags = soup.find_all('a', href=current_href_pattern)
+                    if verbose: print(f"[verbose] Global search found {len(candidate_a_tags)} candidate <a> tags for tab '{tab}'.")
                     
-                    # Attempt 2: If no items found via a container (or container not found), 
-                    # try a global search for <a> tags matching the pattern
-                    if not list_items:
-                        if verbose: print(f"[verbose] No items found via container approach for tab '{tab}'. Trying global search for <a> tags with pattern '{current_href_pattern.pattern}'.")
-                        candidate_a_tags = soup.find_all('a', href=current_href_pattern)
-                        if verbose: print(f"[verbose] Global search found {len(candidate_a_tags)} candidate <a> tags for tab '{tab}'.")
+                    # Filter these candidates to ensure they are likely articles
+                    for item_a in candidate_a_tags:
+                        company_span_present = item_a.find('span', class_=re.compile(r'text-\[#')) 
+                        title_h5_present = item_a.find('h5')
                         
-                        # Filter these candidates to ensure they are likely articles
-                        # list_items is already empty here, so we can append directly
-                        for item_a in candidate_a_tags:
-                            company_span_present = item_a.find('span', class_=re.compile(r'text-\[#')) 
-                            title_h5_present = item_a.find('h5')
-                            
-                            if company_span_present and title_h5_present:
-                                list_items.append(item_a)
-                            elif verbose:
-                                # Log why an item was filtered out if it's useful for debugging
-                                # print(f"[verbose] Filtered out candidate item for tab '{tab}': company_span={bool(company_span_present)}, title_h5={bool(title_h5_present)}, href={item_a.get('href')}")
-                                pass
-                        
-                        if verbose: print(f"[verbose] After filtering global candidates for tab '{tab}', {len(list_items)} items remain.")
+                        if company_span_present and title_h5_present:
+                            list_items.append(item_a)
+                        elif verbose:
+                            # Log why an item was filtered out if it's useful for debugging
+                            # print(f"[verbose] Filtered out candidate item for tab '{tab}': company_span={bool(company_span_present)}, title_h5={bool(title_h5_present)}, href={item_a.get('href')}")
+                            pass
+                    
+                    if verbose: print(f"[verbose] After filtering global candidates for tab '{tab}', {len(list_items)} items remain.")
 
                     if not list_items:
-                        if container_found: 
-                             if verbose: print(f"[verbose] Container found but no valid articles within it for tab {tab} using pattern '{current_href_pattern.pattern}'.")
-                        if verbose: print(f"[verbose] No articles found for tab {tab} after all attempts.")
+                        if verbose: print(f"[verbose] No articles found for tab {tab} after global search and filtering.")
                         await asyncio.sleep(INTER_TAB_DELAY) # Wait before next tab
                         continue # Try next tab
 

@@ -115,6 +115,12 @@ def generate_gts_placements_plot(aggregated_data, game_name):
 def normalize_game_name_for_search(text: str) -> str:
     text = text.lower()
     # Roman numerals → Arabic
+    text = re.sub(r'\bX\b', '10', text)
+    text = re.sub(r'\bix\b', '9', text)
+    text = re.sub(r'\bviii\b', '8', text)
+    text = re.sub(r'\bvii\b', '7', text)
+    text = re.sub(r'\bvi\b', '6', text)
+    text = re.sub(r'\bv\b', '5', text)
     text = re.sub(r'\biv\b', '4', text)
     text = re.sub(r'\biii\b', '3', text)
     text = re.sub(r'\bii\b', '2', text)

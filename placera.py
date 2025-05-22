@@ -37,6 +37,11 @@ companies_to_track = [
     'Rovio', 'Thunderful', 'MGI', 'Electronic Arts',
     'Take-Two', 'Stillfront', 'Asmodee', 'ASMODEE'
 ]
+TAB_HREF_PATTERNS = {
+    'telegram': re.compile(r'^/telegram/'),
+    'pressmeddelande': re.compile(r'^/pressmeddelanden/'),
+    'extern-analys': re.compile(r'^/externa-analyser/')
+}
 REQUEST_TIMEOUT = 15  # seconds
 MAX_FETCH_RETRIES = 3
 RETRY_DELAY_BASE = 5  # seconds
@@ -51,11 +56,9 @@ DEFAULT_HEADERS = {
 
 def load_seen():
     try:
-        # Ensure deque has maxlen when loading
-        loaded_deque = pickle.load(open(seen_file,'rb'))
-        # Re-create deque with maxlen constraint if it wasn't saved with one or if size changed
-        resized_deque = deque(loaded_deque, maxlen=max_queue_size)
-        return resized_deque
+        loaded = pickle.load(open(seen_file,'rb'))
+        # enforce maxlen so old entries get pushed out when new ones arrive
+        return deque(loaded, maxlen=max_queue_size)
     except FileNotFoundError:
         return deque(maxlen=max_queue_size)
     except Exception:
@@ -74,6 +77,19 @@ def save_seen(q):
 seen_articles = load_seen()
 
 async def send_to_discord(title, raw_date, url, company, source, icon_url, bot):
+    if bot is None:
+        # Handle the case where bot is None (e.g., during local testing)
+        print(f"[INFO] Local test: Would send Discord message:")
+        print(f"  Title: {company or 'Placera'}")
+        print(f"  Description: {title}")
+        print(f"  URL: {url}")
+        print(f"  Timestamp: {datetime.now(timezone.utc)}")
+        if source:
+            print(f"  Footer: {source} (Icon: {icon_url or 'N/A'})")
+        # log_message is assumed to handle console/file logging independently of a live bot
+        log_message(f'(Local Test) Sent "{title}" ({raw_date}) to Discord.')
+        return
+
     chan = bot.get_channel(TELEGRAM_CHANNEL)
     if not chan:
         # Using original error_message for critical failure
@@ -123,10 +139,10 @@ async def fetch(session, url, retries=MAX_FETCH_RETRIES, delay_base=RETRY_DELAY_
             await error_message(f'Unexpected fetch error for {url}: {e}')
             return None # Don't retry unknown errors
 
-    return None # Should not be reached if retries are configured > 0, but acts as a safeguard
+    return None # Should not be reached if retries are configured > 0, but acts as a safeguards
 
 
-async def check_placera(bot):
+async def check_placera(bot, verbose=False):
     tabs = ['telegram','pressmeddelande','extern-analys']
     base = 'https://www.placera.se/telegram?tab={}'
     loop_delay, max_loop_delay = 60, 600
@@ -137,50 +153,136 @@ async def check_placera(bot):
             success_occurred = False
             try:
                 for tab in tabs:
+                    current_href_pattern = TAB_HREF_PATTERNS.get(tab)
+                    if not current_href_pattern:
+                        if verbose: print(f"[verbose] No href pattern defined for tab '{tab}'. Skipping article search for this tab.")
+                        await asyncio.sleep(INTER_TAB_DELAY) # Still respect inter-tab delay
+                        continue
+
                     fetch_url = base.format(tab)
+                    if verbose:
+                        print(f"[verbose] Fetching tab='{tab}' → {fetch_url} (expecting links matching: {current_href_pattern.pattern})")
                     html = await fetch(session, fetch_url)
+
                     if not html:
-                        continue # Skip tab on fetch failure
+                        continue  # Skip tab on fetch failure
 
                     soup = BeautifulSoup(html, 'html.parser')
-                    # Adjusted selectors (keep checking/updating these if parsing fails)
-                    container = soup.select_one('ul.list.list--links') or soup.select_one('div.feed.list.list--links')
-                    if not container:
-                        container = soup.select_one('div.w-full.bg-surf-tertiary div.flex.flex-col')
+                    
+                    list_items = [] # This will store the final <a> tags to be processed
+                    container_found = False
 
-                    if not container:
-                        # Use original error_message
-                        await error_message(f'Could not find article container in {tab} ({fetch_url}). Structure might have changed.', bot)
+                    # Attempt 1: Find a known container and then items within it
+                    container_selectors = [
+                        'ul.list.list--links',
+                        'div.feed.list.list--links',
+                        'div.w-full.bg-surf-tertiary div.flex.flex-col'
+                    ]
+                    for sel in container_selectors:
+                        container = soup.select_one(sel)
+                        if container:
+                            container_found = True
+                            # Try to find <li> items first, then extract <a> from them matching the pattern
+                            li_elements = container.select('li.feed__list-item')
+                            for li_item in li_elements:
+                                a_tag_in_li = li_item.find('a', href=current_href_pattern)
+                                if a_tag_in_li:
+                                    list_items.append(a_tag_in_li)
+                            
+                            # If no <a> tags found via <li>s, try finding <a> directly in container matching the pattern
+                            if not list_items: # Only if <li> search yielded nothing
+                                a_tags_in_container = container.find_all('a', href=current_href_pattern)
+                                list_items.extend(a_tags_in_container)
+
+                            if list_items: # Found items via container
+                                if verbose: print(f"[verbose] Found {len(list_items)} items via container selector '{sel}' using pattern '{current_href_pattern.pattern}' for tab '{tab}'")
+                                break 
+                    
+                    # Attempt 2: If no items found via a container (or container not found), 
+                    # try a global search for <a> tags matching the pattern
+                    if not list_items:
+                        if verbose: print(f"[verbose] No items found via container approach for tab '{tab}'. Trying global search for <a> tags with pattern '{current_href_pattern.pattern}'.")
+                        candidate_a_tags = soup.find_all('a', href=current_href_pattern)
+                        if verbose: print(f"[verbose] Global search found {len(candidate_a_tags)} candidate <a> tags for tab '{tab}'.")
+                        
+                        # Filter these candidates to ensure they are likely articles
+                        # list_items is already empty here, so we can append directly
+                        for item_a in candidate_a_tags:
+                            company_span_present = item_a.find('span', class_=re.compile(r'text-\[#')) 
+                            title_h5_present = item_a.find('h5')
+                            
+                            if company_span_present and title_h5_present:
+                                list_items.append(item_a)
+                            elif verbose:
+                                # Log why an item was filtered out if it's useful for debugging
+                                # print(f"[verbose] Filtered out candidate item for tab '{tab}': company_span={bool(company_span_present)}, title_h5={bool(title_h5_present)}, href={item_a.get('href')}")
+                                pass
+                        
+                        if verbose: print(f"[verbose] After filtering global candidates for tab '{tab}', {len(list_items)} items remain.")
+
+                    if not list_items:
+                        if container_found: 
+                             if verbose: print(f"[verbose] Container found but no valid articles within it for tab {tab} using pattern '{current_href_pattern.pattern}'.")
+                        if verbose: print(f"[verbose] No articles found for tab {tab} after all attempts.")
+                        await asyncio.sleep(INTER_TAB_DELAY) # Wait before next tab
                         continue # Try next tab
 
-                    # Find articles within the container
-                    list_items = container.select('li.feed__list-item') or container.find_all('a', href=re.compile(r'^/telegram/'))
-
-                    for item in list_items:
-                        a_tag = item if item.name == 'a' else item.find('a', href=re.compile(r'^/telegram/'))
-                        if not a_tag: continue
-
+                    # Now, list_items contains only <a> tags matching the current_href_pattern and (if global) filters
+                    for a_tag in list_items: # Iterate directly over the <a> tags
                         href = a_tag.get('href')
-                        if not href: continue
+                        # This check should ideally not be needed if current_href_pattern ensures href exists,
+                        # but it's a safe guard.
+                        if not href: 
+                            if verbose: print(f"[verbose] Skipping a_tag with no href: {a_tag.prettify()}")
+                            continue
 
                         full_url = 'https://www.placera.se' + href
 
                         # Extract info - Selectors might need adjustment
-                        company_span = a_tag.select_one('span.button__label.truncate') or a_tag.select_one('span.text-brand, span.font-bold') or a_tag.find('span', class_=re.compile(r'text-\[#'))
+                        company_span = a_tag.select_one('span.button__label.truncate') or \
+                                       a_tag.select_one('span.text-brand, span.font-bold') or \
+                                       a_tag.find('span', class_=re.compile(r'text-\[#')) # Matches example
                         company = company_span.text.strip() if company_span else None
 
-                        title_tag = a_tag.select_one('h3.heading--small') or a_tag.find('h5') or a_tag.select_one('p.news_feed__paragraph')
+                        title_tag = a_tag.select_one('h3.heading--small') or \
+                                    a_tag.find('h5') or \
+                                    a_tag.select_one('p.news_feed__paragraph') # h5 matches example
                         title = title_tag.text.strip() if title_tag else ''
 
-                        date_tag = a_tag.select_one('time.feed__timestamp') or a_tag.find('p', string=re.compile(r'.+'))
+                        # Date tag refinement
+                        date_tag = a_tag.select_one('time.feed__timestamp') # Original selector for <time>
+                        if not date_tag:
+                            # Try specific P tag for date based on example structure's classes
+                            # Example: <p class="font-sans text-sm text-text-main ...">
+                            date_tag = a_tag.select_one('p.text-sm.text-text-main')
+                        if not date_tag:
+                             # Fallback to the original broader search if the specific one fails
+                             date_tag = a_tag.find('p', string=re.compile(r'.+')) # General <p> tag
+                        
                         raw_date = date_tag.text.strip() if date_tag else ''
                         if date_tag and date_tag.name == 'time' and date_tag.has_attr('datetime'):
                              raw_date = date_tag['datetime']
 
-                        source_p = a_tag.select_one('p.feed__meta') or (a_tag.find_all('p')[-1] if a_tag.find_all('p') else None)
+                        source_p = a_tag.select_one('p.feed__meta') or \
+                                   (a_tag.find_all('p')[-1] if len(a_tag.find_all('p')) > (1 if date_tag and date_tag.name == 'p' else 0) else None) # Avoid picking date as source
+                        if source_p and date_tag and source_p == date_tag : # Ensure source_p is not the same as date_tag if date_tag was a <p>s
+                            all_p = a_tag.find_all('p')
+                            if len(all_p) > 1: # If there are multiple p tags, try to find one that is not the date
+                                for p_tag_candidate in reversed(all_p): # Check from last
+                                    if p_tag_candidate != date_tag:
+                                        source_p = p_tag_candidate
+                                        break
+                                else: # All p tags were the date tag? Unlikely.
+                                    source_p = None 
+                            else: # Only one p tag, and it was used for date
+                                source_p = None
+
                         source, icon_url = get_source_icon(source_p.text.strip()) if source_p else (None, None)
 
-                        key = full_url # Use URL as the primary key
+                        if verbose:
+                            print(f"[verbose] Scanning article: url={full_url}, title={title!r}, date={raw_date!r}, company={company!r}")
+
+                        key = full_url  # Use URL as the primary key
                         if not key: # Fallback if URL somehow fails
                             key = f'{tab}|{raw_date}|{title}'
 
@@ -227,3 +329,8 @@ async def check_placera(bot):
 async def placera_updates(bot):
     # No starting log message as per request
     await check_placera(bot)
+
+if __name__ == "__main__":
+    import asyncio
+    # Run in verbose mode without a real Discord bot for local testing
+    asyncio.run(check_placera(bot=None, verbose=True))

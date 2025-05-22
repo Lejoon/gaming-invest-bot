@@ -478,23 +478,14 @@ async def report_command(ctx, *, company_name):
     else:
         await ctx.send(f"No hits found.")
     
-async def chart_command(ctx, *, company_name, period: Optional[Union[str, Period]] = None, test=False):
+async def chart_command(ctx, *, company_name, period: Optional[Period] = None, test=False): # Ensure period is Optional[Period]
     result = await search_avanza(company_name)
     order_book_id = ''
     name = ''
 
-    user_provided_period_enum: Optional[Period] = None
-    if isinstance(period, str):
-        user_provided_period_enum = parse_period_str(period)
-        if user_provided_period_enum is None:
-            await ctx.send(f"Invalid period: {period}. Valid periods are: 1d, 1w, 1m, 3m, ytd, 1y, 3y, 5y, all.")
-            return
-    elif isinstance(period, Period):
-        user_provided_period_enum = period
-    
-    # Determine the final period to use for the API call.
-    # Default to ONE_Y if no valid period was provided by the user.
-    final_api_period_enum = user_provided_period_enum if user_provided_period_enum is not None else Period.ONE_Y
+    # 'period' is now Optional[Period], parsing and validation is done by the caller (main.py).
+    # Default to ONE_Y if no period was provided by the user (i.e., period is None).
+    final_api_period_enum = period if period is not None else Period.ONE_Y
     
     # The resolution is kept as Resolution.DAY as per existing logic for this command.
     final_api_resolution_enum = Resolution.DAY 

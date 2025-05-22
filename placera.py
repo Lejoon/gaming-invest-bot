@@ -260,12 +260,15 @@ async def check_placera(bot, verbose=False):
                         if key in seen_articles:
                             continue
 
-                        success_occurred = True # Mark success if we reach here
-
                         # Track only specified companies
-                        if company and any(tc.lower() in company.lower() for tc in companies_to_track):
+                        company_match = company and any(tc.lower() in company.lower() for tc in companies_to_track)
+                        title_match = title and any(tc.lower() in title.lower() for tc in companies_to_track)
+
+                        if company_match or title_match:
                             # Call send_to_discord which contains the original log message
                             await send_to_discord(title, raw_date, full_url, company, source, icon_url, bot)
+
+                        success_occurred = True # Mark success if we reach here
 
                         seen_articles.append(key)
                         # Save less frequently to reduce I/O

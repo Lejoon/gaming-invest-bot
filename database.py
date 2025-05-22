@@ -125,7 +125,7 @@ class Database:
         
         # Calculate the threshold timestamp: 30 days ago.
         from datetime import datetime, timedelta
-        threshold_dt = datetime.now() - timedelta(days=30)
+        threshold_dt = datetime.now() - timedelta(days=90)
         threshold_str = threshold_dt.strftime('%Y-%m-%d %H')
         
         # Query SteamTopGames for records with this appid from the last 30 days.

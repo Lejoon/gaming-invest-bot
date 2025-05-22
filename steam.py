@@ -57,7 +57,7 @@ def generate_gts_placements_plot(aggregated_data, game_name):
     
     # Plot the placements as a line plot with markers.
     ax.plot(positions, placements, marker='o', linestyle='-', color='#7289DA', markersize=3)
-    ax.set_title(f"{game_name.upper()}, LAST MONTH GTS PLACEMENTS (log)", fontsize=6, weight='bold', loc='left')
+    ax.set_title(f"{game_name.upper()}, LAST QUARTER GTS PLACEMENTS (log)", fontsize=6, weight='bold', loc='left')
     
     # Process x-axis labels so that every tick is on two lines:
     # The first line shows "Year Month" and the second line shows the day.

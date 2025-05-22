@@ -12,6 +12,7 @@ import discord
 import io
 import difflib
 import numpy as np
+import re  # ← add this import
 from pipeline import BasePipeline
 
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
@@ -111,17 +112,51 @@ def generate_gts_placements_plot(aggregated_data, game_name):
     discord_file = discord.File(fp=image_stream, filename="placements_plot.png")
     return image_stream, discord_file
 
+def normalize_game_name_for_search(text: str) -> str:
+    text = text.lower()
+    # Roman numerals → Arabic
+    text = re.sub(r'\biv\b', '4', text)
+    text = re.sub(r'\biii\b', '3', text)
+    text = re.sub(r'\bii\b', '2', text)
+    # Hyphens → spaces
+    text = text.replace('-', ' ')
+    # Remove punctuation
+    text = re.sub(r"[:!?'®™©]", "", text)
+    # Collapse spaces
+    return re.sub(r'\s+', ' ', text).strip()
+
 def get_best_game_match(user_query, db):
-    # Fetch all game names from the database.
     cursor = db.conn.execute("SELECT game_name FROM GameTranslation")
+    original_game_names = [row[0] for row in cursor.fetchall()]
+    if not original_game_names:
+        return None
 
-    game_names = [row[0] for row in cursor.fetchall()]
+    q = normalize_game_name_for_search(user_query)
+    if not q:
+        return None
 
-    # Use difflib to find the closest match.
-    # n=1 means we only get the best match; cutoff=0.6 means only return matches with a score >= 0.6.
-    matches = difflib.get_close_matches(user_query, game_names, n=1, cutoff=0.9)
-    if matches:
-        return matches[0]
+    pairs = []
+    for orig in original_game_names:
+        norm = normalize_game_name_for_search(orig)
+        if norm:
+            pairs.append((norm, orig))
+
+    # 1) close match via difflib
+    names = [p[0] for p in pairs]
+    close = difflib.get_close_matches(q, names, n=1, cutoff=0.75)
+    if close:
+        return next(orig for norm, orig in pairs if norm == close[0])
+
+    # 2) prefix match
+    prefix = [p for p in pairs if p[0].startswith(q)]
+    if prefix:
+        return min(prefix, key=lambda x: len(x[0]))[1]
+
+    # 3) substring match
+    substr = [p for p in pairs if q in p[0]]
+    if substr:
+        return min(substr, key=lambda x: len(x[0]))[1]
+
     return None
 
 

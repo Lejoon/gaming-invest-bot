@@ -12,7 +12,7 @@ import discord
 import io
 import difflib
 import numpy as np
-import re  # ← add this import
+import re  # ← add this import if not present
 from pipeline import BasePipeline
 
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
@@ -115,7 +115,7 @@ def generate_gts_placements_plot(aggregated_data, game_name):
 def normalize_game_name_for_search(text: str) -> str:
     text = text.lower()
     # Roman numerals → Arabic
-    text = re.sub(r'\bX\b', '10', text)
+    text = re.sub(r'\bx\b', '10', text)
     text = re.sub(r'\bix\b', '9', text)
     text = re.sub(r'\bviii\b', '8', text)
     text = re.sub(r'\bvii\b', '7', text)
@@ -147,11 +147,15 @@ def get_best_game_match(user_query, db):
         if norm:
             pairs.append((norm, orig))
 
-    # 1) close match via difflib
-    names = [p[0] for p in pairs]
-    close = difflib.get_close_matches(q, names, n=1, cutoff=0.75)
-    if close:
-        return next(orig for norm, orig in pairs if norm == close[0])
+    # 1) word‐level match: all tokens must match whole words
+    query_tokens = q.split()
+    word_matches = [
+        (norm, orig) for norm, orig in pairs
+        if all(token in norm.split() for token in query_tokens)
+    ]
+    if word_matches:
+        word_matches.sort(key=lambda x: len(x[0]))
+        return word_matches[0][1]
 
     # 2) prefix match
     prefix = [p for p in pairs if p[0].startswith(q)]
@@ -162,6 +166,12 @@ def get_best_game_match(user_query, db):
     substr = [p for p in pairs if q in p[0]]
     if substr:
         return min(substr, key=lambda x: len(x[0]))[1]
+
+    # 4) difflib fallback
+    names = [p[0] for p in pairs]
+    close = difflib.get_close_matches(q, names, n=1, cutoff=0.75)
+    if close:
+        return next(orig for norm, orig in pairs if norm == close[0])
 
     return None
 

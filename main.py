@@ -79,6 +79,9 @@ from pipeline import schedule_pipeline
 from psstore import daily_ps_database_refresh
 from fi_blankning import update_fi_from_web
 
+# Import and initialize Avanza session
+from avanza_auth import get_avanza_session
+
 # Initialize the task variables to None
 websocket_task = None
 daily_morning_task = None
@@ -93,6 +96,14 @@ async def on_ready():
     global websocket_task, daily_morning_task, daily_evening_task, placera_task, steam_task, fi_task, ps_task
 
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
+
+    # Attempt to authenticate with Avanza on startup
+    print("Initializing Avanza session...")
+    session, push_id = get_avanza_session()
+    if session:
+        print("Avanza session initialized successfully.")
+    else:
+        print("Failed to initialize Avanza session on startup. Will retry on first command.")
 
     if websocket_task is None or websocket_task.done():
         print('Starting background websocket task.')

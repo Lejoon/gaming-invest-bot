@@ -20,6 +20,9 @@ from discord.ext import commands
 import os
 import asyncio
 
+# Import the new Avanza authentication function
+from avanzaauth import get_avanza_session, BASE_URL # Assuming BASE_URL is needed here, otherwise remove
+
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -126,7 +129,7 @@ class Resolution(str, Enum):
     HOUR = "hour"
     
 class Period(str, Enum):
-    ONE_D = "one_day"
+    ONE_D = "today"
     ONE_W = "one_week"
     ONE_M = "one_month"
     THREE_M = "three_months"
@@ -205,19 +208,72 @@ async def get_chart_data(
     """
     Return chart data for an order book for the specified time period with given resolution
     """
+    session, _ = get_avanza_session() # Get authenticated session
 
-    #TODO: use options
+    if not session:
+        # Fallback to unauthenticated request or handle error
+        print("Failed to get authenticated Avanza session. Falling back to unauthenticated request.")
+        # Existing unauthenticated request logic
+        options = {"timePeriod": period.lower()}
+        if resolution is not None:
+            options["resolution"] = resolution.lower()
+
+        for _ in range(3):
+            try:
+                # Ensure BASE_URL is defined or imported if you use it directly here
+                url = f"{BASE_URL}/_api/price-chart/stock/{order_book_id}?timePeriod={period}" 
+                # Use a new requests.Session() for unauthenticated or manage a separate one
+                unauth_session = requests.Session()
+                response = unauth_session.get(url, headers={'Content-Type': 'application/json'})
+                response.raise_for_status() # Check for HTTP errors
+                
+                ohlc_data = response.json()["ohlc"]
+                # ... rest of the existing unauthenticated data processing ...
+                chart_data = [
+                    {
+                        'time': ohlc['timestamp'],
+                        'open': ohlc['open'],
+                        'high': ohlc['high'],
+                        'low': ohlc['low'],
+                        'close': ohlc['close'],
+                        'volume': ohlc['totalVolumeTraded'],
+                    }
+                    for ohlc in ohlc_data
+                ]
+                
+                # Make into DF
+                df = pd.DataFrame(chart_data)
+                
+                df["time"] = [
+                datetime.fromtimestamp(x / 1000).astimezone(timezone("Europe/Stockholm"))
+                for x in df["time"]]
+                
+                df = df.set_index(pd.to_datetime(df['time']))
+                df['MA10'] = df['close'].rolling(window=10).mean()
+                df['MA50'] = df['close'].rolling(window=50).mean()
+                df['MA200'] = df['close'].rolling(window=200).mean()
+                return pd.DataFrame(df)
+
+            except ValidationError as e:
+                print(f"Validation error (unauthenticated): {e}")
+                await asyncio.sleep(3) # Use asyncio.sleep in async functions
+            except Exception as e:
+                print(f"Error fetching chart data (unauthenticated): {e}")
+                await asyncio.sleep(3)
+        return None # Return None if all retries fail
+
+    # If authenticated session is available, use it
     options = {"timePeriod": period.lower()}
-
     if resolution is not None:
-        #TODO: use resolution
         options["resolution"] = resolution.lower()
 
     for _ in range(3):
         try:
-            url = f"https://www.avanza.se/_api/price-chart/stock/{order_book_id}?timePeriod={period}"
-            headers = {'Content-Type': 'application/json'}
-            response = requests.get(url, headers=headers)
+            # Ensure BASE_URL is defined or imported
+            url = f"{BASE_URL}/_api/price-chart/stock/{order_book_id}?timePeriod={period}"
+            # Use the authenticated session
+            response = session.get(url, headers={'Content-Type': 'application/json'})
+            response.raise_for_status() # Check for HTTP errors
             
             ohlc_data = response.json()["ohlc"]
 
@@ -248,13 +304,38 @@ async def get_chart_data(
 
             return pd.DataFrame(df)
 
-
         except ValidationError as e:
-            print(f"Validation error: {e}")
-            sleep(3)
+            print(f"Validation error (authenticated): {e}")
+            await asyncio.sleep(3) # Use asyncio.sleep in async functions
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP error fetching chart data (authenticated): {e}")
+            if e.response.status_code == 401: # Unauthorized
+                print("Avanza session might be invalid/expired. Invalidating session.")
+                # To invalidate the session, we rely on the logic within avanza_auth.py
+                # where get_avanza_session() or its helper _authenticate() will try to re-auth
+                # if the session is found to be None or if _keep_alive marks it as None.
+                # The fetch_price_chart_authenticated in avanza_auth.py sets avanza_session to None on 401.
+                # If get_chart_data directly uses the session and gets 401,
+                # it should signal avanza_auth to invalidate its global session.
+                # This can be done by calling a dedicated function in avanza_auth if available,
+                # or by setting the global avanza_session in avanza_auth to None.
+                # For now, we assume that if a 401 occurs here, the next call to get_avanza_session()
+                # will attempt re-authentication because the session object itself might be stale
+                # or the underlying mechanism in avanza_auth.py handles this.
+                # A more direct approach would be:
+                # from avanza_auth import invalidate_avanza_session
+                # invalidate_avanza_session()
+                # This requires adding invalidate_avanza_session() to avanza_auth.py:
+                # def invalidate_avanza_session():
+                #     global avanza_session
+                #     avanza_session = None
+                #     print("Avanza session invalidated.")
+                pass # Rely on avanza_auth.py to handle re-authentication on next get_avanza_session() call
+            await asyncio.sleep(3)
         except Exception as e:
-            print(f"Error fetching chart data: {e}")
-            sleep(3)
+            print(f"Error fetching chart data (authenticated): {e}")
+            await asyncio.sleep(3) # Use asyncio.sleep in async functions
+    return None # Return None if all retries fail
 
 def plot_chart_data(df: pd.DataFrame, title: str):
     """
@@ -425,8 +506,9 @@ def testing():
         print(chart_data)
         image_stream = plot_chart_data(chart_data, title=hit.title)
         if image_stream:
-            # Assuming you have a way to display or save image_stream
-            pass
+            with open("chart_plot.png", "wb") as f:
+                f.write(image_stream.getvalue())
+            
 
 
 def test_report(query: str):
@@ -478,4 +560,5 @@ if __name__ == "__main__":
     #testing()
     # Await get_latest_events
     test_report("evolution")
+    testing()
     #bot.run(BOT_TOKEN)

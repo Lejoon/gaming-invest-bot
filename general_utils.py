@@ -64,7 +64,7 @@ def aiohttp_retry(retries=5, base_delay=15.0, max_delay=120.0):
                     else:
                         # Calculate delay: base_delay * 2 ^ attempt, but with a random factor to avoid thundering herd problem
                         delay = min(max_delay, base_delay * 2 ** attempt) * (0.5 + random.random())
-                        print(f'Awaiting {delay:.2f} seconds before retrying...')
+                        log_message(f'Awaiting {delay:.2f} seconds before retrying...')
                         await asyncio.sleep(delay)
             return await func(*args, **kwargs)  # Try one last time
         return wrapper

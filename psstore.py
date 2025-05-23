@@ -128,18 +128,18 @@ async def gtsps_command(ctx, db: Database):
         if place_yesterday is not None:
             delta = place_yesterday - current_place
             if delta > 0:
-                delta_str = f"+{delta}"
+                delta_str = f"(+{delta})"
             elif delta == 0:
-                delta_str = "-"
+                delta_str = "(-)"
             else:
-                delta_str = f"{delta}"
-            line = f"{current_place}. ({delta_str}) {game_name}"
+                delta_str = f"({delta})"
+            line = f"{current_place}. {delta_str} {game_name}"
         else:
             line = f"{current_place}. {game_name}"
         response_lines.append(line)
 
     joined_response = '\n'.join(response_lines)
-    await ctx.send(f"**Top 15 PS Games:**\n{joined_response}")
+    await ctx.send(f"**Top 15 PS Games:**\n```\n{joined_response}\n```")
 
 # --------------------------
 # (Optional) Daily PS Database Refresh

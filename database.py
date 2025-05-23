@@ -164,9 +164,14 @@ class Database:
         if not timestamp:
             return {}
             
+        try:
+            current_dt = datetime.strptime(timestamp, '%Y-%m-%d %H')
+        except ValueError:
+            return {}
+
         if table == 'SteamTopGames':
             # Calculate the date for yesterday and always set the hour to 21
-            yesterday_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=1)).strftime('%Y-%m-%d')
+            yesterday_date = (current_dt - timedelta(days=1)).strftime('%Y-%m-%d')
             yesterday_timestamp_21 = f"{yesterday_date} 21"
             
             self.cursor.execute('''
@@ -178,14 +183,27 @@ class Database:
             return {appid: place for place, appid in rows}
     
         elif table == 'PSTopGames':
-            # Calculate yesterday's date and always set the hour to 21
-            yesterday_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=1)).strftime('%Y-%m-%d')
-            yesterday_timestamp_21 = f"{yesterday_date} 21"
+            yesterday_date_str = (current_dt - timedelta(days=1)).strftime('%Y-%m-%d')
             
+            # Find the latest timestamp for yesterday's date in PSTopGames
+            query_latest_yesterday_ts = """
+                SELECT MAX(timestamp) 
+                FROM PSTopGames
+                WHERE SUBSTR(timestamp, 1, 10) = ?
+            """
+            self.cursor.execute(query_latest_yesterday_ts, (yesterday_date_str,))
+            latest_yesterday_timestamp_row = self.cursor.fetchone()
+
+            if not latest_yesterday_timestamp_row or not latest_yesterday_timestamp_row[0]:
+                return {} # No data found for yesterday
+
+            latest_yesterday_timestamp = latest_yesterday_timestamp_row[0]
+
+            # Fetch all games for that specific latest timestamp
             self.cursor.execute('''
                 SELECT place, ps_id FROM PSTopGames
                 WHERE timestamp = ?
-            ''', (yesterday_timestamp_21,))
+            ''', (latest_yesterday_timestamp,))
             
             rows = self.cursor.fetchall()
             return {ps_id: place for place, ps_id in rows}

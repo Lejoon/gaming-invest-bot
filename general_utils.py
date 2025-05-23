@@ -77,23 +77,31 @@ def aiohttp_retry(retries=5, base_delay=15.0, max_delay=120.0):
 
 def normalize_game_name_for_search(text: str) -> str:
     text = text.lower()
-    # Roman numerals → Arabic
-    # Replace specific Roman numerals first to avoid conflicts (e.g., IV before V)
-    text = re.sub(r'viii', '8', text) # Order matters: VIII before VII, VI, V
-    text = re.sub(r'vii', '7', text)  # VII before VI, V
-    text = re.sub(r'vi', '6', text)   # VI before V
-    text = re.sub(r'iv', '4', text)   # IV before V
-    text = re.sub(r'ix', '9', text)   # IX before X
-    text = re.sub(r'iii', '3', text) # III before II
-    text = re.sub(r'ii', '2', text)
-    text = re.sub(r'v', '5', text)
-    text = re.sub(r'x', '10', text)
+
+    # Define Roman numeral replacements in order to avoid conflicts (e.g., IX before X, VIII before V)
+    # Using r'\broman\b' for word boundaries.
+    roman_map = [
+        (r'\bviii\b', '8'), # VIII before V, VII, II, I
+        (r'\bvii\b', '7'),  # VII before V, II, I
+        (r'\bvi\b', '6'),   # VI before V, I
+        (r'\bix\b', '9'),   # IX before X, I
+        (r'\biv\b', '4'),   # IV before V, I
+        (r'\bx\b', '10'),   # X after IX
+        (r'\bv\b', '5'),    # V after VIII, VII, VI, IV
+        (r'\biii\b', '3'), # III before II, I
+        (r'\bii\b', '2'),  # II before I
+    ]
+
+    for pattern, replacement in roman_map:
+        text = re.sub(pattern, replacement, text) # Corrected: No longer need to replace \\b
+
     # Hyphens → spaces
     text = text.replace('-', ' ')
-    # Remove punctuation
+    # Remove specified punctuation
     text = re.sub(r"[:!?'®™©]", "", text)
-    # Collapse spaces
-    return re.sub(r'\s+', ' ', text).strip()
+    # Collapse multiple spaces to a single space and strip leading/trailing spaces
+    text = re.sub(r'\\s+', ' ', text).strip() # Correcting \\s+ to \s+
+    return text
 
 def generate_gts_placements_plot(aggregated_data, game_name):
     """
@@ -140,9 +148,9 @@ def generate_gts_placements_plot(aggregated_data, game_name):
         month_abbr = dt.strftime("%b")
         day = str(dt.day)  # Remove any leading zero
         if prev_year is None or prev_month is None or year != prev_year or month_abbr != prev_month:
-            new_label = f"{year} {month_abbr}\n{day}"
+            new_label = f"{year} {month_abbr}\\n{day}"
         else:
-            new_label = f"\n{day}"
+            new_label = f"\\n{day}"
         new_labels.append(new_label)
         prev_year, prev_month = year, month_abbr
 

@@ -161,8 +161,11 @@ class Database:
         return aggregated_data
     
     def get_yesterday_top_games(self, timestamp, table='SteamTopGames'):
+        if not timestamp:
+            return {}
+            
         if table == 'SteamTopGames':
-            # Calculate the date for yesterday and set the hour to 21
+            # Calculate the date for yesterday and always set the hour to 21
             yesterday_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=1)).strftime('%Y-%m-%d')
             yesterday_timestamp_21 = f"{yesterday_date} 21"
             
@@ -175,7 +178,7 @@ class Database:
             return {appid: place for place, appid in rows}
     
         elif table == 'PSTopGames':
-            # Calculate yesterday's timestamp for the PS table
+            # Calculate yesterday's date and always set the hour to 21
             yesterday_date = (datetime.strptime(timestamp, '%Y-%m-%d %H') - timedelta(days=1)).strftime('%Y-%m-%d')
             yesterday_timestamp_21 = f"{yesterday_date} 21"
             
@@ -186,6 +189,8 @@ class Database:
             
             rows = self.cursor.fetchall()
             return {ps_id: place for place, ps_id in rows}
+        
+        return {}
     
     def get_last_week_ranks(self, timestamp, current_top_appids):
         # Calculate the date for 7 days ago and set the hour to 21

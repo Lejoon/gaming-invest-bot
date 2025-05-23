@@ -31,7 +31,7 @@ async def update_ps_top_sellers(db: Database) -> list:
     'timestamp', 'place', 'ps_id', 'game_name', and 'discount'.
     """
     BASE_URL = "https://store.playstation.com/en-us/pages/browse"
-    TOTAL_PAGES = 5
+    TOTAL_PAGES = 10
     games = []
     placement_counter = 0
     # Use current time rounded down to the hour
@@ -103,8 +103,17 @@ async def gtsps_command(ctx, db: Database):
     """
     top_games = await update_ps_top_sellers(db)
     latest_timestamp = db.get_latest_timestamp('PSTopGames')
-    # Assume db.get_yesterday_top_games returns a dict: { ps_id: yesterday_placement, ... }
-    yesterday_games = db.get_yesterday_top_games(latest_timestamp, table='PSTopGames')
+    
+    # Calculate yesterday's timestamp at hour 21 for comparison
+    if latest_timestamp:
+        current_dt = datetime.strptime(latest_timestamp, '%Y-%m-%d %H')
+        yesterday_dt = current_dt - timedelta(days=1)
+        yesterday_timestamp = yesterday_dt.strftime('%Y-%m-%d') + ' 21'
+    else:
+        yesterday_timestamp = None
+    
+    # Get yesterday's games using the calculated yesterday timestamp
+    yesterday_games = db.get_yesterday_top_games(yesterday_timestamp, table='PSTopGames')
 
     # Limit to the top 15 games
     top_games = top_games[:15]

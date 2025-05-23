@@ -11,3 +11,4 @@ get_gts_placements_query.sql
 .gitignore
 seen_articles.pkl
 debug_game_matching.py
+seen_articles.pkl

@@ -78,21 +78,22 @@ def aiohttp_retry(retries=5, base_delay=15.0, max_delay=120.0):
 def normalize_game_name_for_search(text: str) -> str:
     text = text.lower()
     # Roman numerals → Arabic
-    text = re.sub(r'\\bx\\b', '10', text)
-    text = re.sub(r'\\bix\\b', '9', text)
-    text = re.sub(r'\\bviii\\b', '8', text)
-    text = re.sub(r'\\bvii\\b', '7', text)
-    text = re.sub(r'\\bvi\\b', '6', text)
-    text = re.sub(r'\\bv\\b', '5', text)
-    text = re.sub(r'\\biv\\b', '4', text)
-    text = re.sub(r'\\biii\\b', '3', text)
-    text = re.sub(r'\\bii\\b', '2', text)
+    # Replace specific Roman numerals first to avoid conflicts (e.g., IV before V)
+    text = re.sub(r'viii', '8', text) # Order matters: VIII before VII, VI, V
+    text = re.sub(r'vii', '7', text)  # VII before VI, V
+    text = re.sub(r'vi', '6', text)   # VI before V
+    text = re.sub(r'iv', '4', text)   # IV before V
+    text = re.sub(r'ix', '9', text)   # IX before X
+    text = re.sub(r'iii', '3', text) # III before II
+    text = re.sub(r'ii', '2', text)
+    text = re.sub(r'v', '5', text)
+    text = re.sub(r'x', '10', text)
     # Hyphens → spaces
     text = text.replace('-', ' ')
     # Remove punctuation
     text = re.sub(r"[:!?'®™©]", "", text)
     # Collapse spaces
-    return re.sub(r'\\s+', ' ', text).strip()
+    return re.sub(r'\s+', ' ', text).strip()
 
 def generate_gts_placements_plot(aggregated_data, game_name):
     """
@@ -139,7 +140,7 @@ def generate_gts_placements_plot(aggregated_data, game_name):
         month_abbr = dt.strftime("%b")
         day = str(dt.day)  # Remove any leading zero
         if prev_year is None or prev_month is None or year != prev_year or month_abbr != prev_month:
-            new_label = f"{year} {month_abbr}\\n{day}"
+            new_label = f"{year} {month_abbr}\n{day}"
         else:
             new_label = f"\\n{day}"
         new_labels.append(new_label)

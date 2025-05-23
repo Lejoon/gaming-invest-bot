@@ -150,9 +150,8 @@ async def check_placera(bot, verbose=False):
 
     async with aiohttp.ClientSession() as session:
         while True:
-            if bot:
-                await log_message("[Placera] Starting new Placera scan cycle.")
-            else:
+            await log_message("[Placera] Starting new Placera scan cycle.")
+            if not bot:
                 print("[INFO] Starting new Placera scan cycle (local test).")
             success_occurred = False
             try:

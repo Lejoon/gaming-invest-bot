@@ -3,6 +3,11 @@ import asyncio
 import random
 import aiohttp
 import discord
+import re
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import io
 
 def log_message(message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -69,3 +74,104 @@ def aiohttp_retry(retries=5, base_delay=15.0, max_delay=120.0):
             return await func(*args, **kwargs)  # Try one last time
         return wrapper
     return decorator
+
+def normalize_game_name_for_search(text: str) -> str:
+    text = text.lower()
+    # Roman numerals → Arabic
+    text = re.sub(r'\\bx\\b', '10', text)
+    text = re.sub(r'\\bix\\b', '9', text)
+    text = re.sub(r'\\bviii\\b', '8', text)
+    text = re.sub(r'\\bvii\\b', '7', text)
+    text = re.sub(r'\\bvi\\b', '6', text)
+    text = re.sub(r'\\bv\\b', '5', text)
+    text = re.sub(r'\\biv\\b', '4', text)
+    text = re.sub(r'\\biii\\b', '3', text)
+    text = re.sub(r'\\bii\\b', '2', text)
+    # Hyphens → spaces
+    text = text.replace('-', ' ')
+    # Remove punctuation
+    text = re.sub(r"[:!?'®™©]", "", text)
+    # Collapse spaces
+    return re.sub(r'\\s+', ' ', text).strip()
+
+def generate_gts_placements_plot(aggregated_data, game_name):
+    """
+    Generates a plot showing the last month's GTS placements for a specific game.
+    The aggregated_data dict is expected to contain:
+      - "positions": a list or numpy array of numeric positions (e.g. day indices)
+      - "aggregated_labels": a list of labels corresponding to each position (e.g. dates in "YYYY-MM-DD" format)
+      - "placements": a list or numpy array of placement values (e.g. rank position per day)
+    
+    The plot uses styling similar to generate_sales_plot.
+    
+    Returns:
+        A tuple: (image_stream, discord_file) where discord_file is a discord.File
+        ready for sending.
+    """
+    positions = aggregated_data["positions"]
+    aggregated_labels = aggregated_data["aggregated_labels"]
+    placements = np.round(aggregated_data["placements"]).astype(int)
+    
+    # Set up plotting parameters.
+    rcParams.update({'font.size': 7})
+    plt.rcParams['font.family'] = ['sans-serif']
+    plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
+    
+    # Create a figure and a single axis.
+    fig, ax = plt.subplots(figsize=(8, 4))
+    
+    # Plot the placements as a line plot with markers.
+    ax.plot(positions, placements, marker='o', linestyle='-', color='#7289DA', markersize=3)
+    ax.set_title(f"{game_name.upper()}, LAST QUARTER GTS PLACEMENTS (log)", fontsize=6, weight='bold', loc='left')
+    
+    # Process x-axis labels so that every tick is on two lines:
+    # The first line shows "Year Month" and the second line shows the day.
+    new_labels = []
+    prev_year = None
+    prev_month = None
+    for label in aggregated_labels:
+        try:
+            dt = datetime.strptime(label, "%Y-%m-%d")
+        except ValueError:
+            new_labels.append(label) # Keep original label if parsing fails
+            continue
+        year = dt.strftime("%Y")
+        month_abbr = dt.strftime("%b")
+        day = str(dt.day)  # Remove any leading zero
+        if prev_year is None or prev_month is None or year != prev_year or month_abbr != prev_month:
+            new_label = f"{year} {month_abbr}\\n{day}"
+        else:
+            new_label = f"\\n{day}"
+        new_labels.append(new_label)
+        prev_year, prev_month = year, month_abbr
+
+    ax.set_xticks(positions)
+    ax.set_xticklabels(new_labels, fontsize=6)
+    
+    # Set the y-axis to a logarithmic scale and invert it so that lower numbers appear higher.
+    ax.set_yscale('log')
+    ax.invert_yaxis()
+    
+    # Remove the y-axis completely:
+    ax.yaxis.set_visible(False)
+    # Hide the left, top, and right spines (leave the bottom spine visible for the x-axis)
+    ax.spines['left'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    
+    # Annotate each data point with its (rounded) placement value.
+    for x, y in zip(positions, placements):
+        if np.isfinite(y): # Check for finite values before annotating
+            ax.text(x, y - 0.3, f"{y}", fontsize=6, ha='center', va='bottom')
+    
+    plt.tight_layout()
+    
+    # Save the plot to a BytesIO stream and create a discord.File.
+    image_stream = io.BytesIO()
+    fig.savefig(image_stream, format='png')
+    image_stream.seek(0)
+    plt.close(fig)
+    
+    discord_file = discord.File(fp=image_stream, filename="placements_plot.png")
+    return image_stream, discord_file

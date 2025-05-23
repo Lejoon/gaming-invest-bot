@@ -1,19 +1,19 @@
 from datetime import datetime, timedelta
-from general_utils import get_seconds_until
+from general_utils import get_seconds_until, normalize_game_name_for_search, generate_gts_placements_plot
 import aiohttp
 from bs4 import BeautifulSoup
-import os
 from database import Database
-import asyncio
 from general_utils import log_message, error_message, aiohttp_retry
-import matplotlib.pyplot as plt
 from matplotlib import rcParams
-import discord
-import io
-import difflib
-import numpy as np
-import re  # ← add this import if not present
 from pipeline import BasePipeline
+import os
+import asyncio
+import numpy as np
+import matplotlib.pyplot as plt
+import io
+import discord
+import re
+import difflib
 
 STEAM_API_KEY = os.getenv('STEAM_API_KEY')
 
@@ -28,108 +28,6 @@ async def fetch_ccu(appid):
     else:
         ccu = 0
     return ccu
-
-def generate_gts_placements_plot(aggregated_data, game_name):
-    """
-    Generates a plot showing the last month's GTS placements for a specific game.
-    The aggregated_data dict is expected to contain:
-      - "positions": a list or numpy array of numeric positions (e.g. day indices)
-      - "aggregated_labels": a list of labels corresponding to each position (e.g. dates in "YYYY-MM-DD" format)
-      - "placements": a list or numpy array of placement values (e.g. rank position per day)
-    
-    The plot uses styling similar to generate_sales_plot.
-    
-    Returns:
-        A tuple: (image_stream, discord_file) where discord_file is a discord.File
-        ready for sending.
-    """
-    positions = aggregated_data["positions"]
-    aggregated_labels = aggregated_data["aggregated_labels"]
-    placements = np.round(aggregated_data["placements"]).astype(int)
-    
-    # Set up plotting parameters.
-    rcParams.update({'font.size': 7})
-    plt.rcParams['font.family'] = ['sans-serif']
-    plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
-    
-    # Create a figure and a single axis.
-    fig, ax = plt.subplots(figsize=(8, 4))
-    
-    # Plot the placements as a line plot with markers.
-    ax.plot(positions, placements, marker='o', linestyle='-', color='#7289DA', markersize=3)
-    ax.set_title(f"{game_name.upper()}, LAST QUARTER GTS PLACEMENTS (log)", fontsize=6, weight='bold', loc='left')
-    
-    # Process x-axis labels so that every tick is on two lines:
-    # The first line shows "Year Month" and the second line shows the day.
-    new_labels = []
-    prev_year = None
-    prev_month = None
-    for label in aggregated_labels:
-        try:
-            dt = datetime.strptime(label, "%Y-%m-%d")
-        except ValueError:
-            new_labels.append(label)
-            continue
-        year = dt.strftime("%Y")
-        month_abbr = dt.strftime("%b")
-        day = str(dt.day)  # Remove any leading zero
-        if prev_year is None or prev_month is None or year != prev_year or month_abbr != prev_month:
-            new_label = f"{year} {month_abbr}\n{day}"
-        else:
-            new_label = f"\n{day}"
-        new_labels.append(new_label)
-        prev_year, prev_month = year, month_abbr
-
-    ax.set_xticks(positions)
-    ax.set_xticklabels(new_labels, fontsize=6)
-    
-    # Set the y-axis to a logarithmic scale and invert it so that lower numbers appear higher.
-    ax.set_yscale('log')
-    ax.invert_yaxis()
-    
-    # Remove the y-axis completely:
-    ax.yaxis.set_visible(False)
-    # Hide the left, top, and right spines (leave the bottom spine visible for the x-axis)
-    ax.spines['left'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    
-    # Annotate each data point with its (rounded) placement value.
-    for x, y in zip(positions, placements):
-        if np.isfinite(y):
-            # With the y-axis inverted and on a log scale, subtract a small offset to place text above the marker.
-            ax.text(x, y - 0.3, f"{y}", fontsize=6, ha='center', va='bottom')
-    
-    plt.tight_layout()
-    
-    # Save the plot to a BytesIO stream and create a discord.File.
-    image_stream = io.BytesIO()
-    fig.savefig(image_stream, format='png')
-    image_stream.seek(0)
-    plt.close(fig)
-    
-    discord_file = discord.File(fp=image_stream, filename="placements_plot.png")
-    return image_stream, discord_file
-
-def normalize_game_name_for_search(text: str) -> str:
-    text = text.lower()
-    # Roman numerals → Arabic
-    text = re.sub(r'\bx\b', '10', text)
-    text = re.sub(r'\bix\b', '9', text)
-    text = re.sub(r'\bviii\b', '8', text)
-    text = re.sub(r'\bvii\b', '7', text)
-    text = re.sub(r'\bvi\b', '6', text)
-    text = re.sub(r'\bv\b', '5', text)
-    text = re.sub(r'\biv\b', '4', text)
-    text = re.sub(r'\biii\b', '3', text)
-    text = re.sub(r'\bii\b', '2', text)
-    # Hyphens → spaces
-    text = text.replace('-', ' ')
-    # Remove punctuation
-    text = re.sub(r"[:!?'®™©]", "", text)
-    # Collapse spaces
-    return re.sub(r'\s+', ' ', text).strip()
 
 def get_best_game_match(user_query, db):
     cursor = db.conn.execute("SELECT game_name FROM GameTranslation")
@@ -176,7 +74,7 @@ def get_best_game_match(user_query, db):
     return None
 
 
-async def update_steam_top_sellers(db: Database, write_db: bool = True) -> dict:
+async def update_steam_top_sellers(db: Database, write_db: bool = True) -> list: # Changed dict to list
     # Phase 1: paginate and collect metadata (no CCU or DB writes)
     preliminary = []
     current_rank = 0
@@ -277,21 +175,23 @@ async def gts_command(ctx, db, game_name: str = None):
     """
     # If a game name is provided, try to generate a placements graph.
     if game_name is not None:
-        # Try to find the best match for the game name.
-        best_match = get_best_game_match(game_name, db)
-        if best_match is None:
-            await ctx.send(f"No matching game found for '{game_name}'.")
+        matched_game_name = get_best_game_match(game_name, db)
+        if matched_game_name:
+            # Fetch data for the plot (this is a placeholder, adapt to your DB structure)
+            # You'll need a method in your Database class to get this data.
+            # Example: aggregated_data = db.get_gts_placements_for_game(matched_game_name)
+            # For now, let's assume you have a way to get this data:
+            aggregated_data = db.get_aggregated_steam_data_for_game(matched_game_name) # Placeholder
+            if aggregated_data and aggregated_data.get("positions") and aggregated_data.get("placements"):
+                image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name)
+                await ctx.send(file=discord_file)
+                return
+            else:
+                await ctx.send(f"Could not find enough data to generate a plot for '{matched_game_name}'.")
+                return
+        else:
+            await ctx.send(f"Could not find a match for game: '{game_name}'.")
             return
-
-        aggregated_data = db.get_last_month_placements(best_match)
-        if aggregated_data is None:
-            await ctx.send(f"No placement data found for '{best_match}'.")
-            return
-
-        # Generate the placements plot using your plotting function.
-        image_stream, discord_file = generate_gts_placements_plot(aggregated_data, best_match)
-        await ctx.send(file=discord_file)
-        return
 
     # No game name provided; display the standard top sellers list.
     def format_ccu(ccu):
@@ -423,13 +323,15 @@ class SteamPipeline(BasePipeline):
         return items
 
 if __name__ == "__main__":
-    # For testing outside of a bot context:
-    db = Database("steam_top_games.db")
-    class DummyContext:
-        async def send(self, message):
-            print(message)
-    dummy_ctx = DummyContext()
-    
-    # Test the update_steam_top_sellers function and print its result
-    result = asyncio.run(update_steam_top_sellers(db))
-    print(result)
+    # Example usage (optional, for testing)
+    # db = Database("steam_top_games.db")
+    # class DummyContext:
+    #     async def send(self, message=None, file=None):
+    #         if message:
+    #             print(message)
+    #         if file:
+    #             print(f"Sent file: {file.filename}")
+    # dummy_ctx = DummyContext()
+    # asyncio.run(gts_command(dummy_ctx, db, game_name="Some Game Name")) # Test with a game name
+    # asyncio.run(gts_command(dummy_ctx, db)) # Test without a game name
+    pass

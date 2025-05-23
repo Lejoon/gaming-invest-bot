@@ -5,10 +5,11 @@ import html  # to unescape HTML entities
 import time
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
+import discord  # Added import
 
 # Assume these come from your project’s modules.
 from database import Database
-from general_utils import log_message, error_message, aiohttp_retry, get_seconds_until
+from general_utils import log_message, error_message, aiohttp_retry, get_seconds_until, normalize_game_name_for_search, generate_gts_placements_plot # Updated import
 
 # --------------------------
 # PS Top Sellers Scraper
@@ -95,12 +96,80 @@ async def update_ps_top_sellers(db: Database) -> list:
 # Command Function for PS Top Sellers
 # --------------------------
 
-async def gtsps_command(ctx, db: Database):
+def get_best_ps_game_match(user_query, db: Database):
+    """Finds the best match for a user's game query against PS game names."""
+    cursor = db.conn.execute("SELECT DISTINCT game_name FROM PSTranslation") # Assuming PSTranslation table
+    original_game_names = [row[0] for row in cursor.fetchall()]
+    if not original_game_names:
+        return None
+
+    q = normalize_game_name_for_search(user_query)
+    if not q:
+        return None
+
+    pairs = []
+    for orig in original_game_names:
+        norm = normalize_game_name_for_search(orig)
+        if norm:
+            pairs.append((norm, orig))
+
+    # 1) word‐level match: all tokens must match whole words
+    query_tokens = q.split()
+    word_matches = [
+        (norm, orig) for norm, orig in pairs
+        if all(token in norm.split() for token in query_tokens)
+    ]
+    if word_matches:
+        # Prefer shorter matches if multiple word-level matches exist
+        return min(word_matches, key=lambda x: len(x[0]))[1]
+
+    # 2) prefix match
+    prefix = [p for p in pairs if p[0].startswith(q)]
+    if prefix:
+        return min(prefix, key=lambda x: len(x[0]))[1]
+
+    # 3) substring match
+    substr = [p for p in pairs if q in p[0]]
+    if substr:
+        return min(substr, key=lambda x: len(x[0]))[1]
+
+    # 4) difflib fallback (ensure difflib is imported in general_utils or here)
+    # For simplicity, assuming difflib is available via general_utils or globally
+    # import difflib # Would be needed if not imported elsewhere
+    # names = [p[0] for p in pairs]
+    # close = difflib.get_close_matches(q, names, n=1, cutoff=0.75)
+    # if close:
+    #     # Find the original name corresponding to the normalized close match
+    #     for norm_name, orig_name in pairs:
+    #         if norm_name == close[0]:
+    #             return orig_name
+    # For now, skipping difflib for PS Store to keep it simpler unless specified
+
+    return None
+
+async def gtsps_command(ctx, db: Database, game_name: str = None):
     """
-    This command fetches the top PS games, compares each game's
-    current placement (assigned sequentially) with yesterday's placement,
-    and sends a message showing any change.
+    If a game name is provided, generates a graph of its PS Store placements.
+    Otherwise, displays the top 15 PS sellers.
     """
+    if game_name is not None:
+        matched_game_name = get_best_ps_game_match(game_name, db)
+        if matched_game_name:
+            # You will need a method in your Database class to fetch placement data for a PS game
+            # Example: aggregated_data = db.get_ps_gts_placements_for_game(matched_game_name)
+            aggregated_data = db.get_aggregated_ps_data_for_game(matched_game_name) # Placeholder
+            if aggregated_data and aggregated_data.get("positions") and aggregated_data.get("placements"):
+                image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name)
+                await ctx.send(file=discord_file)
+                return
+            else:
+                await ctx.send(f"Could not find enough data to generate a plot for '{matched_game_name}' on PS Store.")
+                return
+        else:
+            await ctx.send(f"Could not find a match for game: '{game_name}' on PS Store.")
+            return
+
+    # No game name provided; display the standard top sellers list.
     top_games = await update_ps_top_sellers(db)
     latest_timestamp = db.get_latest_timestamp('PSTopGames')
     
@@ -183,4 +252,6 @@ if __name__ == "__main__":
             self.is_dummy_context = True # Add a flag to identify dummy context
             
     dummy_ctx = DummyContext()
-    asyncio.run(gtsps_command(dummy_ctx, db))
+    asyncio.run(gtsps_command(dummy_ctx, db)) # Test without game name
+    # To test with a game name:
+    # asyncio.run(gtsps_command(dummy_ctx, db, game_name="Spider-Man"))

@@ -294,7 +294,14 @@ async def check_placera(bot, verbose=False):
 
             except Exception as e:
                 # Use original error_message for main loop errors
-                await error_message(f'Main loop parser/processing error: {e}', bot)
+                try:
+                    await error_message(f'Main loop parser/processing error: {e}', bot)
+                except Exception as em_exception:
+                    # If error_message itself fails, log to console to avoid breaking the loop
+                    # and to ensure the original error is also visible.
+                    timestamp = datetime.now(timezone.utc).isoformat()
+                    print(f"[{timestamp}] [Placera] CRITICAL: The error_message utility failed: {em_exception}")
+                    print(f"[{timestamp}] [Placera] Original error that triggered error_message: {e}")
                 current_loop_delay = min(current_loop_delay * 2, max_loop_delay)
             finally:
                 # Wait before next full cycle

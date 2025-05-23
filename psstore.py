@@ -98,7 +98,7 @@ async def update_ps_top_sellers(db: Database) -> list:
 
 def get_best_ps_game_match(user_query, db: Database):
     """Finds the best match for a user's game query against PS game names."""
-    cursor = db.conn.execute("SELECT DISTINCT game_name FROM PSTranslation") # Assuming PSTranslation table
+    cursor = db.conn.execute("SELECT DISTINCT game_name FROM PSGameTranslation") # Assuming PSTranslation table
     original_game_names = [row[0] for row in cursor.fetchall()]
     if not original_game_names:
         return None

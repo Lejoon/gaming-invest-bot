@@ -177,11 +177,8 @@ async def gts_command(ctx, db, game_name: str = None):
     if game_name is not None:
         matched_game_name = get_best_game_match(game_name, db)
         if matched_game_name:
-            # Fetch data for the plot (this is a placeholder, adapt to your DB structure)
-            # You'll need a method in your Database class to get this data.
-            # Example: aggregated_data = db.get_gts_placements_for_game(matched_game_name)
-            # For now, let's assume you have a way to get this data:
-            aggregated_data = db.get_aggregated_steam_data_for_game(matched_game_name) # Placeholder
+            # Fetch data for the plot
+            aggregated_data = db.get_last_month_placements(matched_game_name) # Changed method name
             if aggregated_data and aggregated_data.get("positions") and aggregated_data.get("placements"):
                 image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name)
                 await ctx.send(file=discord_file)

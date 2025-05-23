@@ -157,7 +157,7 @@ async def gtsps_command(ctx, db: Database, game_name: str = None):
         if matched_game_name:
             # You will need a method in your Database class to fetch placement data for a PS game
             # Example: aggregated_data = db.get_ps_gts_placements_for_game(matched_game_name)
-            aggregated_data = db.get_aggregated_ps_data_for_game(matched_game_name) # Placeholder
+            aggregated_data = db.get_last_month_ps_placements(matched_game_name) # Placeholder, changed method name
             if aggregated_data and aggregated_data.get("positions") and aggregated_data.get("placements"):
                 image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name)
                 await ctx.send(file=discord_file)

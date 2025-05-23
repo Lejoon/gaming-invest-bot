@@ -12,10 +12,12 @@ import random
 from general_utils import log_message, error_message
 
 TELEGRAM_CHANNEL = 1167391973825593424
+PRESS_RELEASES_CHANNEL = 1163373835886805013
 
 icon_dict = {
     'Finwire': 'https://finwire.com/wp-content/uploads/2021/03/1.5-FINWIRE-Logotype-Bird-Icon-2020-PMS021-300x300.png',
     'Nyhetsbyrån Direkt': 'https://media.licdn.com/dms/image/C560BAQFerUMPTdDrAA/company-logo_200_200/0/1569249859285/nyhetsbyr_n_direkt_logo?e=1706745600&v=beta&t=YUjFmqgCdSjIebxklnaYep7RfaKL9vLhfJdJNBA594Q',
+    'MFN': None,  # MFN handled through another proxy
 }
 
 def get_source_icon(src_text):
@@ -76,13 +78,25 @@ def save_seen(q):
 
 seen_articles = load_seen()
 
-async def send_to_discord(title, raw_date, url, company, source, icon_url, bot):
+async def send_to_discord(title, raw_date, url, company, source, icon_url, bot, tab=None):
+    # Skip MFN sources as they're handled through another proxy
+    if source == 'MFN':
+        log_message(f'Skipping MFN source: "{title}" ({raw_date})')
+        return
+
+    # Determine channel based on tab
+    if tab == 'pressmeddelande':
+        channel_id = PRESS_RELEASES_CHANNEL
+    else:
+        channel_id = TELEGRAM_CHANNEL
+
     if bot is None:
         # Handle the case where bot is None (e.g., during local testing)
         print(f"[INFO] Local test: Would send Discord message:")
         print(f"  Title: {company or 'Placera'}")
         print(f"  Description: {title}")
         print(f"  URL: {url}")
+        print(f"  Channel: {channel_id}")
         print(f"  Timestamp: {datetime.now(timezone.utc)}")
         if source:
             print(f"  Footer: {source} (Icon: {icon_url or 'N/A'})")
@@ -90,10 +104,10 @@ async def send_to_discord(title, raw_date, url, company, source, icon_url, bot):
         log_message(f'(Local Test) Sent "{title}" ({raw_date}) to Discord.')
         return
 
-    chan = bot.get_channel(TELEGRAM_CHANNEL)
+    chan = bot.get_channel(channel_id)
     if not chan:
         # Using original error_message for critical failure
-        await error_message(f"Could not find Discord channel {TELEGRAM_CHANNEL}", bot)
+        await error_message(f"Could not find Discord channel {channel_id}", bot)
         return
 
     embed = discord.Embed(
@@ -108,10 +122,10 @@ async def send_to_discord(title, raw_date, url, company, source, icon_url, bot):
     try:
         await chan.send(embed=embed)
         # Keep original log message for successful send
-        log_message(f'Sent "{title}" ({raw_date}) to Discord.')
+        log_message(f'Sent "{title}" ({raw_date}) to Discord channel {channel_id}.')
     except discord.errors.Forbidden:
         # Using original error_message for critical failure
-        await error_message(f"Missing permissions to send message in channel {TELEGRAM_CHANNEL}", bot)
+        await error_message(f"Missing permissions to send message in channel {channel_id}", bot)
     except Exception as e:
         # Using original error_message for critical failure
         await error_message(f"Failed to send message to Discord: {e}", bot)
@@ -269,7 +283,7 @@ async def check_placera(bot, verbose=False):
 
                         if company_match or title_match:
                             # Call send_to_discord which contains the original log message
-                            await send_to_discord(title, raw_date, full_url, company, source, icon_url, bot)
+                            await send_to_discord(title, raw_date, full_url, company, source, icon_url, bot, tab)
 
                         success_occurred = True # Mark success if we reach here
 

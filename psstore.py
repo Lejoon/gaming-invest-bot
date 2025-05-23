@@ -108,12 +108,22 @@ async def gtsps_command(ctx, db: Database):
     if latest_timestamp:
         current_dt = datetime.strptime(latest_timestamp, '%Y-%m-%d %H')
         yesterday_dt = current_dt - timedelta(days=1)
-        yesterday_timestamp = yesterday_dt.strftime('%Y-%m-%d') + ' 21'
+        # The timestamp passed to get_yesterday_top_games will be used to derive yesterday's date.
+        # The method itself will handle finding the correct data for PSTopGames (latest for that date)
+        # or use hour 21 for SteamTopGames.
+        yesterday_query_timestamp = current_dt.strftime('%Y-%m-%d %H') 
     else:
-        yesterday_timestamp = None
+        yesterday_query_timestamp = None
     
     # Get yesterday's games using the calculated yesterday timestamp
-    yesterday_games = db.get_yesterday_top_games(yesterday_timestamp, table='PSTopGames')
+    yesterday_games = db.get_yesterday_top_games(yesterday_query_timestamp, table='PSTopGames')
+
+    # --- Debug print statement ---
+    if hasattr(ctx, 'is_dummy_context'): # Check if it's the dummy context from __main__
+        print("\n--- Debug: yesterday_games ---")
+        print(yesterday_games)
+        print("--- End Debug ---\n")
+    # --- End Debug print statement ---
 
     # Limit to the top 15 games
     top_games = top_games[:15]
@@ -139,7 +149,7 @@ async def gtsps_command(ctx, db: Database):
         response_lines.append(line)
 
     joined_response = '\n'.join(response_lines)
-    await ctx.send(f"**Top 15 PS Games:**\n```\n{joined_response}\n```")
+    await ctx.send(f"**Top 15 PS Games:**\n{joined_response}\n")
 
 # --------------------------
 # (Optional) Daily PS Database Refresh
@@ -168,5 +178,9 @@ if __name__ == "__main__":
     class DummyContext:
         async def send(self, message):
             print(message)
+        
+        def __init__(self):
+            self.is_dummy_context = True # Add a flag to identify dummy context
+            
     dummy_ctx = DummyContext()
     asyncio.run(gtsps_command(dummy_ctx, db))

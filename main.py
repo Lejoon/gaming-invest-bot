@@ -59,8 +59,9 @@ async def steam(ctx, *, game_name):
 # PS Store command
 from psstore import gtsps_command
 @bot.command()
-async def ps(ctx):
-    await gtsps_command(ctx, db)
+async def ps(ctx, *, game_name: str = None):
+    await gtsps_command(ctx, db, game_name)
+    
 
 # Short seller command
 from fi_blankning import short_command    

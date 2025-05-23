@@ -98,7 +98,7 @@ class Database:
         self.cursor.execute(query)
         return self.cursor.fetchone()[0]
     
-    def get_last_month_placements(self, game_name):
+    def get_gts_placements(self, game_name):
         """
         Retrieves aggregated GTS placement data for the given game over the last 30 days.
         

@@ -3,6 +3,7 @@ from general_utils import get_seconds_until, normalize_game_name_for_search, gen
 import aiohttp
 from bs4 import BeautifulSoup
 from database import Database
+import database
 from general_utils import log_message, error_message, aiohttp_retry
 from matplotlib import rcParams
 from pipeline import BasePipeline
@@ -178,7 +179,7 @@ async def gts_command(ctx, db, game_name: str = None):
         matched_game_name = get_best_game_match(game_name, db)
         if matched_game_name:
             # Fetch data for the plot
-            aggregated_data = db.get_last_month_placements(matched_game_name) # Changed method name
+            aggregated_data = db.get_aggregated_data(matched_game_name)
             if aggregated_data and aggregated_data.get("positions") and aggregated_data.get("placements"):
                 image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name)
                 await ctx.send(file=discord_file)

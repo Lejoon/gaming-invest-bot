@@ -7,3 +7,5 @@ tests/
 .DS_Store
 __pycache__/
 local_testing.py
+get_gts_placements_query.sql
+.gitignore

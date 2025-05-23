@@ -148,9 +148,9 @@ def generate_gts_placements_plot(aggregated_data, game_name):
         month_abbr = dt.strftime("%b")
         day = str(dt.day)  # Remove any leading zero
         if prev_year is None or prev_month is None or year != prev_year or month_abbr != prev_month:
-            new_label = f"{year} {month_abbr}\\n{day}"
+            new_label = f"{year} {month_abbr}\n{day}"
         else:
-            new_label = f"\\n{day}"
+            new_label = f"\n{day}"
         new_labels.append(new_label)
         prev_year, prev_month = year, month_abbr
 

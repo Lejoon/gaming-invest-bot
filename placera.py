@@ -117,7 +117,7 @@ async def send_to_discord(title, raw_date, url, company, source, icon_url, bot):
         await error_message(f"Failed to send message to Discord: {e}", bot)
 
 
-async def fetch(session, url, retries=MAX_FETCH_RETRIES, delay_base=RETRY_DELAY_BASE, timeout=REQUEST_TIMEOUT, headers=DEFAULT_HEADERS):
+async def fetch(session, url, bot, retries=MAX_FETCH_RETRIES, delay_base=RETRY_DELAY_BASE, timeout=REQUEST_TIMEOUT, headers=DEFAULT_HEADERS):
     """Fetches URL with retries, timeout, headers, and exponential backoff with jitter."""
     for attempt in range(retries + 1):
         try:
@@ -132,11 +132,11 @@ async def fetch(session, url, retries=MAX_FETCH_RETRIES, delay_base=RETRY_DELAY_
                 await asyncio.sleep(delay)
             else:
                 # Log final failure after all retries using original error_message
-                await error_message(f'Fetch error for {url} after {retries + 1} attempts: {e}')
+                await error_message(f'Fetch error for {url} after {retries + 1} attempts: {e}', bot)
                 return None # Failed after retries
         except Exception as e:
             # Catch any other unexpected errors during fetch using original error_message
-            await error_message(f'Unexpected fetch error for {url}: {e}')
+            await error_message(f'Unexpected fetch error for {url}: {e}', bot)
             return None # Don't retry unknown errors
 
     return None # Should not be reached if retries are configured > 0, but acts as a safeguards
@@ -150,6 +150,10 @@ async def check_placera(bot, verbose=False):
 
     async with aiohttp.ClientSession() as session:
         while True:
+            if bot:
+                await log_message("Starting new Placera scan cycle.", bot)
+            else:
+                print("[INFO] Starting new Placera scan cycle (local test).")
             success_occurred = False
             try:
                 for tab in tabs:
@@ -162,7 +166,7 @@ async def check_placera(bot, verbose=False):
                     fetch_url = base.format(tab)
                     if verbose:
                         print(f"[verbose] Fetching tab='{tab}' → {fetch_url} (expecting links matching: {current_href_pattern.pattern})")
-                    html = await fetch(session, fetch_url)
+                    html = await fetch(session, fetch_url, bot)
 
                     if not html:
                         continue  # Skip tab on fetch failure

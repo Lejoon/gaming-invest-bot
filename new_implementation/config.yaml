@@ -1,0 +1,51 @@
+# Scraper Platform Configuration
+
+# Database settings
+database:
+  path: "scraper.db"
+  
+# Logging configuration
+logging:
+  level: INFO
+  format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+
+# Pipeline configurations
+pipelines:
+  - name: "fi_shortinterest"
+    enabled: true
+    fetcher:
+      class: "plugins.fi_shortinterest.fetcher.FiFetcher"
+      config:
+        poll_interval: 900  # 15 minutes
+    parsers:
+      - class: "plugins.fi_shortinterest.parser.FiAggParser"
+      - class: "plugins.fi_shortinterest.parser.FiActParser"
+    sinks:
+      - name: "database"
+        class: "sinks.database_sink.DatabaseSink"
+        config:
+          db_path: "scraper.db"
+      - name: "discord"
+        class: "sinks.discord_sink.DiscordSink"
+        config:
+          channel_id: 1175019650963222599
+          error_channel_id: 1162053416290361516
+          tracked_companies:
+            - "Embracer Group AB"
+            - "Paradox Interactive AB (publ)"
+            - "Starbreeze AB"
+            - "EG7"
+            - "Enad Global 7"
+            - "Maximum Entertainment"
+            - "MAG Interactive"
+            - "G5 Entertainment AB (publ)"
+            - "Modern Times Group MTG AB"
+            - "Thunderful"
+            - "MGI - Media and Games Invest SE"
+            - "Stillfront Group AB (publ)"
+
+# Global settings
+settings:
+  max_concurrent_pipelines: 5
+  shutdown_timeout: 30
+  health_check_interval: 300  # 5 minutes

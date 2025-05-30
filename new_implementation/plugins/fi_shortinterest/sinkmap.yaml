@@ -1,0 +1,34 @@
+# Default sinks configuration for FI Short Interest plugin
+topics:
+  - topic: "fi.short.aggregate.diff"
+    sinks:
+      - database
+      - discord
+  
+  - topic: "fi.short.positions.diff"
+    sinks:
+      - database
+
+# Sink-specific configuration
+sink_config:
+  database:
+    tables:
+      "fi.short.aggregate": "short_positions"
+      "fi.short.positions": "position_holders"
+  
+  discord:
+    channel_id: 1175019650963222599
+    error_channel_id: 1162053416290361516
+    tracked_companies:
+      - "Embracer Group AB"
+      - "Paradox Interactive AB (publ)"
+      - "Starbreeze AB"
+      - "EG7"
+      - "Enad Global 7"
+      - "Maximum Entertainment"
+      - "MAG Interactive"
+      - "G5 Entertainment AB (publ)"
+      - "Modern Times Group MTG AB"
+      - "Thunderful"
+      - "MGI - Media and Games Invest SE"
+      - "Stillfront Group AB (publ)"

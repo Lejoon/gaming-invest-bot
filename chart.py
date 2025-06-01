@@ -9,7 +9,6 @@ import requests
 from pydantic import BaseModel, ValidationError, Field
 from typing import List, Optional, Union
 from enum import Enum
-from time import sleep
 import pandas as pd
 from datetime import datetime
 from pytz import timezone

@@ -8,7 +8,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from discord import Embed
 from general_utils import log_message, error_message
-import time
 
 CHANNEL_ID = 1161207966855348246
 CUSTOM_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
@@ -40,7 +39,7 @@ async def get_scraped_data():
                 
                 # Reduced wait times
                 WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices")))
-                time.sleep(1)  # Reduced from 2 seconds
+                await asyncio.sleep(1)  # Reduced from 2 seconds - made async
                 
                 web_component = driver.find_element(By.CSS_SELECTOR, 'igws-live-prices')
                 shadow_root = driver.execute_script('return arguments[0].shadowRoot', web_component)

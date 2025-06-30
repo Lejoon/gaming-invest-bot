@@ -103,13 +103,18 @@ def normalize_game_name_for_search(text: str) -> str:
     text = re.sub(r'\\s+', ' ', text).strip() # Correcting \\s+ to \s+
     return text
 
-def generate_gts_placements_plot(aggregated_data, game_name):
+def generate_gts_placements_plot(aggregated_data, game_name, is_steam=True):
     """
     Generates a plot showing the last month's GTS placements for a specific game.
     The aggregated_data dict is expected to contain:
       - "positions": a list or numpy array of numeric positions (e.g. day indices)
       - "aggregated_labels": a list of labels corresponding to each position (e.g. dates in "YYYY-MM-DD" format)
       - "placements": a list or numpy array of placement values (e.g. rank position per day)
+    
+    Args:
+        aggregated_data: Dictionary containing the placement data
+        game_name: Name of the game
+        is_steam: True for Steam, False for PS Store (default: True)
     
     The plot uses styling similar to generate_sales_plot.
     
@@ -131,7 +136,10 @@ def generate_gts_placements_plot(aggregated_data, game_name):
     
     # Plot the placements as a line plot with markers.
     ax.plot(positions, placements, marker='o', linestyle='-', color='#7289DA', markersize=3)
-    ax.set_title(f"{game_name.upper()}, LAST QUARTER GTS PLACEMENTS (log)", fontsize=6, weight='bold', loc='left')
+    
+    # Set title based on platform
+    platform_name = "Steam" if is_steam else "PS Store"
+    ax.set_title(f"{game_name.upper()}, LAST QUARTER {platform_name} PLACEMENTS (log)", fontsize=6, weight='bold', loc='left')
     
     # Process x-axis labels so that every tick is on two lines:
     # The first line shows "Year Month" and the second line shows the day.

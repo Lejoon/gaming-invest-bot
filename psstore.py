@@ -22,17 +22,21 @@ async def fetch_page_content(url: str) -> str:
         async with session.get(url) as response:
             return await response.text()
 
-async def update_ps_top_sellers(db: Database) -> list:
+async def update_ps_top_sellers(db: Database, pages: int = 5) -> list:
     """
-    Scrapes the PlayStation Store top sellers from 5 pages,
+    Scrapes the PlayStation Store top sellers from the specified number of pages,
     updates the translation table, and (if an update is due)
     inserts the new data into the PSTopGames table.
+    
+    Args:
+        db: Database instance
+        pages: Number of pages to scrape (default: 5)
     
     Returns a list of game dictionaries with keys:
     'timestamp', 'place', 'ps_id', 'game_name', and 'discount'.
     """
     BASE_URL = "https://store.playstation.com/en-us/pages/browse"
-    TOTAL_PAGES = 10
+    TOTAL_PAGES = pages
     games = []
     placement_counter = 0
     # Use current time rounded down to the hour
@@ -159,7 +163,7 @@ async def gtsps_command(ctx, db: Database, game_name: str = None):
             # Example: aggregated_data = db.get_ps_gts_placements_for_game(matched_game_name)
             aggregated_data = db.get_last_month_ps_placements(matched_game_name) # Placeholder, changed method name
             if aggregated_data and aggregated_data.get("positions") and aggregated_data.get("placements"):
-                image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name)
+                image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name, is_steam=False)
                 await ctx.send(file=discord_file)
                 return
             else:
@@ -232,7 +236,7 @@ async def daily_ps_database_refresh(db: Database):
         await asyncio.sleep(get_seconds_until(21, 0))
 
         # Update the PS top sellers data in the database.
-        await update_ps_top_sellers(db)
+        await update_ps_top_sellers(db, pages=42)
         print('Database updated with PS top sellers.')
 
 # --------------------------

@@ -181,7 +181,7 @@ async def gts_command(ctx, db, game_name: str = None):
             # Fetch data for the plot
             aggregated_data = db.get_gts_placements(matched_game_name)
             if aggregated_data and aggregated_data.get("positions") and aggregated_data.get("placements"):
-                image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name)
+                image_stream, discord_file = generate_gts_placements_plot(aggregated_data, matched_game_name, is_steam=True)
                 await ctx.send(file=discord_file)
                 return
             else:

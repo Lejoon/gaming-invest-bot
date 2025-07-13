@@ -100,17 +100,20 @@ class Database:
     
     def get_gts_placements(self, game_name):
         """
-        Retrieves aggregated GTS placement data for the given game over the last 30 days.
+        Retrieves aggregated GTS placement data for the given game over the last 90 days.
         
         The function:
          1. Finds the appid for the given game name from the GameTranslation table.
-         2. Queries SteamTopGames for all records with that appid and a timestamp within the last 30 days.
-         3. Aggregates the data by day (using the date portion of the timestamp) and calculates the average placement.
+         2. Queries SteamTopGames for all records with that appid and a timestamp within the last 90 days.
+         3. Aggregates the data by day (using the date portion of the timestamp) and calculates the harmonic mean placement.
          4. Returns a dictionary with keys:
             - "positions": a list of numeric positions for plotting.
             - "aggregated_labels": a list of date strings corresponding to each position.
-            - "placements": a list of average placement values (as floats) per day.
+            - "placements": a list of harmonic mean placement values (as floats) per day.
         If no data is found for the given game name, returns None.
+        
+        Note: Harmonic mean is used instead of arithmetic mean as it gives more weight to better (lower) ranks,
+        which is more appropriate for ranking data.
         """
         # Look up the appid using an exact (case-insensitive) match.
         self.cursor.execute("""
@@ -123,15 +126,17 @@ class Database:
         
         appid = row[0]
         
-        # Calculate the threshold timestamp: 30 days ago.
+        # Calculate the threshold timestamp: 90 days ago.
         from datetime import datetime, timedelta
         threshold_dt = datetime.now() - timedelta(days=90)
         threshold_str = threshold_dt.strftime('%Y-%m-%d %H')
         
-        # Query SteamTopGames for records with this appid from the last 30 days.
+        # Query SteamTopGames for records with this appid from the last 90 days.
         # We extract the date part (YYYY-MM-DD) from the timestamp (which is stored as "YYYY-MM-DD HH").
+        # Use harmonic mean for better ranking aggregation (gives more weight to better/lower ranks)
         query = """
-            SELECT substr(timestamp, 1, 10) AS date, AVG(place) AS avg_place
+            SELECT substr(timestamp, 1, 10) AS date, 
+                   COUNT(place) / SUM(1.0 / place) AS harmonic_mean_place
             FROM SteamTopGames
             WHERE appid = ? AND timestamp >= ?
             GROUP BY date
@@ -147,9 +152,9 @@ class Database:
         placements = []
         positions = []
         
-        for index, (date_label, avg_place) in enumerate(rows):
+        for index, (date_label, harmonic_mean_place) in enumerate(rows):
             aggregated_labels.append(date_label)
-            placements.append(avg_place)
+            placements.append(harmonic_mean_place)
             positions.append(index)
         
         aggregated_data = {
@@ -160,6 +165,62 @@ class Database:
         
         return aggregated_data
     
+    def get_gts_placements_with_minmax(self, game_name):
+        """
+        Retrieves aggregated GTS placement data for the given game over the last 90 days,
+        including min, max, and harmonic mean placements per day.
+        """
+        self.cursor.execute("""
+            SELECT appid FROM GameTranslation
+            WHERE LOWER(game_name) = LOWER(?)
+        """, (game_name,))
+        row = self.cursor.fetchone()
+        if row is None:
+            return None
+        
+        appid = row[0]
+        
+        from datetime import datetime, timedelta
+        threshold_dt = datetime.now() - timedelta(days=90)
+        threshold_str = threshold_dt.strftime('%Y-%m-%d %H')
+        
+        query = """
+            SELECT
+                substr(timestamp, 1, 10) AS date,
+                COUNT(place) / SUM(1.0 / place) AS harmonic_mean_place,
+                MIN(place) AS min_place,
+                MAX(place) AS max_place
+            FROM SteamTopGames
+            WHERE appid = ? AND timestamp >= ?
+            GROUP BY date
+            ORDER BY date ASC
+        """
+        self.cursor.execute(query, (appid, threshold_str))
+        rows = self.cursor.fetchall()
+        
+        if not rows:
+            return None
+        
+        aggregated_labels = []
+        harmonic_mean_placements = []
+        min_placements = []
+        max_placements = []
+        
+        for date_label, harmonic_mean_place, min_place, max_place in rows:
+            aggregated_labels.append(date_label)
+            harmonic_mean_placements.append(harmonic_mean_place)
+            min_placements.append(min_place)
+            max_placements.append(max_place)
+        
+        aggregated_data = {
+            "aggregated_labels": aggregated_labels,
+            "avg_placements": harmonic_mean_placements,
+            "min_placements": min_placements,
+            "max_placements": max_placements
+        }
+        
+        return aggregated_data
+
     def get_last_month_ps_placements(self, game_name):
         """
         Retrieves aggregated GTS placement data for the given game over the last 30 days from PS Store.
@@ -397,3 +458,144 @@ class Database:
     
     def close(self):
         self.conn.close()
+
+    def get_gts_placements_with_minmax_delta_days(self, game_name, release_date_str):
+        """
+        Retrieves aggregated GTS placement data for the given game over the last 90 days,
+        including min, max, and harmonic mean placements per day, and computes delta days to release.
+        release_date_str: string in 'YYYY-MM-DD' format (e.g. '2025-07-24')
+        Returns a dict with keys:
+            - delta_days: list of ints (negative, days to release)
+            - avg_placements: list of floats
+            - min_placements: list of ints
+            - max_placements: list of ints
+        """
+        self.cursor.execute("""
+            SELECT appid FROM GameTranslation
+            WHERE LOWER(game_name) = LOWER(?)
+        """, (game_name,))
+        row = self.cursor.fetchone()
+        if row is None:
+            return None
+        appid = row[0]
+        from datetime import datetime, timedelta
+        threshold_dt = datetime.now() - timedelta(days=90)
+        threshold_str = threshold_dt.strftime('%Y-%m-%d %H')
+        query = """
+            SELECT
+                substr(timestamp, 1, 10) AS date,
+                COUNT(place) / SUM(1.0 / place) AS harmonic_mean_place,
+                MIN(place) AS min_place,
+                MAX(place) AS max_place
+            FROM SteamTopGames
+            WHERE appid = ? AND timestamp >= ?
+            GROUP BY date
+            ORDER BY date ASC
+        """
+        self.cursor.execute(query, (appid, threshold_str))
+        rows = self.cursor.fetchall()
+        if not rows:
+            return None
+        release_date = datetime.strptime(release_date_str, '%Y-%m-%d')
+        delta_days = []
+        avg_placements = []
+        min_placements = []
+        max_placements = []
+        for date_label, harmonic_mean_place, min_place, max_place in rows:
+            date_obj = datetime.strptime(date_label, '%Y-%m-%d')
+            delta = (date_obj - release_date).days
+            delta_days.append(delta)
+            avg_placements.append(harmonic_mean_place)
+            min_placements.append(min_place)
+            max_placements.append(max_place)
+        aggregated_data = {
+            "delta_days": delta_days,
+            "avg_placements": avg_placements,
+            "min_placements": min_placements,
+            "max_placements": max_placements
+        }
+        return aggregated_data
+    
+    def get_multiple_games_placements_delta_days(self, games_info, days_before_release=90):
+        """
+        Retrieves aggregated GTS placement data for multiple games with delta days to release.
+        For each game, gets data from specified days before release to release day.
+        games_info: list of dicts with keys 'game_name' and 'release_date_str'
+        days_before_release: number of days before release to look back (default: 90)
+        Returns a dict with game names as keys and placement data as values.
+        """
+        results = {}
+        
+        for game_info in games_info:
+            game_name = game_info['game_name']
+            release_date_str = game_info['release_date_str']
+            
+            # Use the new reusable function
+            game_data = self.get_game_placements_delta_days(game_name, release_date_str, days_before_release)
+            if game_data:
+                results[game_name] = game_data
+        
+        return results
+    
+    def get_game_placements_delta_days(self, game_name, release_date_str, days_before_release=90):
+        """
+        Retrieves aggregated GTS placement data for a single game with delta days to release.
+        
+        Args:
+            game_name: Name of the game to look up
+            release_date_str: Release date in 'YYYY-MM-DD' format
+            days_before_release: Number of days before release to look back (default: 90)
+            
+        Returns:
+            Dict with keys:
+                - delta_days: list of ints (negative, days to release)
+                - avg_placements: list of floats (harmonic mean placements)
+            Returns None if no data found.
+        """
+        # Look up the appid
+        self.cursor.execute("""
+            SELECT appid FROM GameTranslation
+            WHERE LOWER(game_name) = LOWER(?)
+        """, (game_name,))
+        row = self.cursor.fetchone()
+        if row is None:
+            return None
+            
+        appid = row[0]
+        release_date = datetime.strptime(release_date_str, '%Y-%m-%d')
+        
+        # Calculate date range: specified days before release to release day
+        start_date = release_date - timedelta(days=days_before_release)
+        end_date = release_date
+        
+        start_date_str = start_date.strftime('%Y-%m-%d')
+        end_date_str = end_date.strftime('%Y-%m-%d')
+        
+        query = """
+            SELECT
+                substr(timestamp, 1, 10) AS date,
+                COUNT(place) / SUM(1.0 / place) AS harmonic_mean_place
+            FROM SteamTopGames
+            WHERE appid = ? AND substr(timestamp, 1, 10) >= ? AND substr(timestamp, 1, 10) <= ?
+            GROUP BY date
+            ORDER BY date ASC
+        """
+        self.cursor.execute(query, (appid, start_date_str, end_date_str))
+        rows = self.cursor.fetchall()
+        
+        if not rows:
+            return None
+            
+        delta_days = []
+        avg_placements = []
+        
+        for date_label, harmonic_mean_place in rows:
+            date_obj = datetime.strptime(date_label, '%Y-%m-%d')
+            delta = (date_obj - release_date).days
+            delta_days.append(delta)
+            avg_placements.append(harmonic_mean_place)
+        
+        return {
+            "delta_days": delta_days,
+            "avg_placements": avg_placements
+        }

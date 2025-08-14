@@ -39,8 +39,10 @@ def create_wuchang_plot_delta_days():
     primary_game_name = "Wuchang: Fallen Feathers"
     primary_release_date = "2025-07-24"
     
-    comparison_game_name = "Stellar Blade™"  # Change this to any game name
-    comparison_release_date = "2024-04-26"   # Change this to the game's release date (YYYY-MM-DD)
+    comparison_game_name = "Kingdom Come: Deliverance II"
+    comparison_release_date = "2025-02-04"
+    #comparison_game_name = "Stellar Blade™"  # Change this to any game name
+    #comparison_release_date = "2024-04-26"   # Change this to the game's release date (YYYY-MM-DD)
     
     db_name = "steam_top_games.db"
     output_filename = "wuchang_placements_delta_days.png"

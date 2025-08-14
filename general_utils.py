@@ -341,7 +341,7 @@ def generate_comparison_placements_plot_delta_days(games_data, primary_game, com
             color='#DC143C', markersize=3)
 
     # Set title to match original style exactly
-    ax.set_title(f"STEAM PLACEMENTS COMPARISON (log scale)\nDays to Release: -{days_before_release} to 0", 
+    ax.set_title(f"STEAM PLACEMENTS COMPARISON (log scale, average placement during day)\nDays to Release: -{days_before_release} to 0", 
                 fontsize=6, weight='bold', loc='left')
     
     # X-axis: delta days - match original label style
@@ -373,16 +373,18 @@ def generate_comparison_placements_plot_delta_days(games_data, primary_game, com
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     
-    # Add Summer sale annotations (hardcoded as requested)
+    # Add Summer sale annotations (hardcoded as requested) with curved boxes
     ax.annotate('Summer sale start', 
-                xy=(-27, 252), xytext=(-15, 400),
+                xy=(-27, 252), xytext=(-15, 500),
                 arrowprops=dict(arrowstyle='->', color='black', lw=1),
-                fontsize=6, color='black')
+                fontsize=6, color='black',
+                bbox=dict(boxstyle="round,pad=0.3", facecolor='lightgray', alpha=0.8, edgecolor='black'))
     
     ax.annotate('Summer sale end', 
-                xy=(-14, 93), xytext=(-5, 150),
+                xy=(-14, 93), xytext=(-5, 200),
                 arrowprops=dict(arrowstyle='->', color='black', lw=1),
-                fontsize=6, color='black')
+                fontsize=6, color='black',
+                bbox=dict(boxstyle="round,pad=0.3", facecolor='lightgray', alpha=0.8, edgecolor='black'))
     
     # Annotate each data point with its placement value - match original style exactly
     for x, y in zip(primary_delta_days, primary_avg_placements):
@@ -393,7 +395,12 @@ def generate_comparison_placements_plot_delta_days(games_data, primary_game, com
         if np.isfinite(y):
             ax.text(x, y - 0.3, f"{y}", fontsize=6, ha='center', va='bottom')
     
+    # make legend
+    ax.legend([primary_game, comparison_game], loc='upper right', fontsize=6, frameon=False)
     plt.tight_layout()
+    
+    # legend
+    
 
     # Save to buffer - match original
     buf = io.BytesIO()

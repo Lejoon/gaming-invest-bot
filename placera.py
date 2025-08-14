@@ -16,7 +16,7 @@ PRESS_RELEASES_CHANNEL = 1163373835886805013
 
 icon_dict = {
     'Finwire': 'https://finwire.com/wp-content/uploads/2021/03/1.5-FINWIRE-Logotype-Bird-Icon-2020-PMS021-300x300.png',
-    'Nyhetsbyrån Direkt': 'https://media.licdn.com/dms/image/C560BAQFerUMPTdDrAA/company-logo_200_200/0/1569249859285/nyhetsbyr_n_direkt_logo?e=1706745600&v=beta&t=YUjFmqgCdSjIebxklnaYep7RfaKL9vLhfJdJNBA594Q',
+    'Nyhetsbyrån Direkt': 'https://media.licdn.com/dms/image/v2/D4D0BAQGQgNOpVKGypg/company-logo_200_200/company-logo_200_200/0/1732630386396/nyhetsbyr_n_direkt_logo?e=1758153600&v=beta&t=_anf5gLW_Q0ACK_G49tqRM1SUMiXke-hik5H-uyzrf8',
     'MFN': None,  # MFN handled through another proxy
 }
 
@@ -34,7 +34,7 @@ seen_file = 'seen_articles.pkl'
 companies_to_track = [
     'Embracer', 'Paradox', 'Ubisoft', 'Starbreeze',
     'EG7', 'Flexion', 'Enad Global 7', 'Take Two',
-    'Capcom', 'Maximum Entertainment', 'MAG Interactive',
+    'Capcom', 'Maximum Entertainment', 'MAG Interactive', 'MAGI', 'G5 Entertainment', # (comma fixed before 'G5')
     'G5', 'Remedy', 'MTG', 'Modern Times Group',
     'Rovio', 'Thunderful', 'MGI', 'Electronic Arts',
     'Take-Two', 'Stillfront', 'Asmodee', 'ASMODEE'
@@ -158,7 +158,7 @@ async def fetch(session, url, bot, retries=MAX_FETCH_RETRIES, delay_base=RETRY_D
 
 async def check_placera(bot, verbose=False):
     tabs = ['telegram','pressmeddelande','extern-analys']
-    base = 'https://www.placera.se/telegram?tab={}'
+    base = 'https://www.placera.se/telegram?tab={}&limit=200'
     loop_delay, max_loop_delay = 60, 600
     current_loop_delay = loop_delay
 
@@ -193,19 +193,24 @@ async def check_placera(bot, verbose=False):
                     candidate_a_tags = soup.find_all('a', href=current_href_pattern)
                     if verbose: print(f"[verbose] Global search found {len(candidate_a_tags)} candidate <a> tags for tab '{tab}'.")
                     
-                    # Filter these candidates to ensure they are likely articles
+                    # Relaxed filtering: require (title h5, date p, source p); company span optional.
+                    # This allows articles without an explicit company span but whose title contains a tracked company to be considered hits.
                     for item_a in candidate_a_tags:
-                        company_span_present = item_a.find('span', class_=re.compile(r'text-\[#')) 
-                        title_h5_present = item_a.find('h5')
-                        
-                        if company_span_present and title_h5_present:
+                        title_tag = item_a.find('h5')
+                        date_p = item_a.find('p', class_=lambda c: c and 'text-sm' in c.split())
+                        source_p = None
+                        for p in item_a.find_all('p'):
+                            if p.get_text(strip=True).startswith('Källa:'):
+                                source_p = p
+                        if title_tag and date_p and source_p:
                             list_items.append(item_a)
                         elif verbose:
-                            # Log why an item was filtered out if it's useful for debugging
-                            # print(f"[verbose] Filtered out candidate item for tab '{tab}': company_span={bool(company_span_present)}, title_h5={bool(title_h5_present)}, href={item_a.get('href')}")
-                            pass
-                    
-                    if verbose: print(f"[verbose] After filtering global candidates for tab '{tab}', {len(list_items)} items remain.")
+                            missing = []
+                            if not title_tag: missing.append('title')
+                            if not date_p: missing.append('date')
+                            if not source_p: missing.append('source')
+                            print(f"[verbose] Skip href={item_a.get('href')} missing={','.join(missing)}")
+                    if verbose: print(f"[verbose] After relaxed filtering for tab '{tab}', {len(list_items)} items remain.")
 
                     if not list_items:
                         if verbose: print(f"[verbose] No articles found for tab {tab} after global search and filtering.")
@@ -213,84 +218,64 @@ async def check_placera(bot, verbose=False):
                         continue # Try next tab
 
                     # Now, list_items contains only <a> tags matching the current_href_pattern and (if global) filters
-                    for a_tag in list_items: # Iterate directly over the <a> tags
+                    for a_tag in list_items:  # Only anchors that passed strict filter
                         href = a_tag.get('href')
-                        # This check should ideally not be needed if current_href_pattern ensures href exists,
-                        # but it's a safe guard.
-                        if not href: 
-                            if verbose: print(f"[verbose] Skipping a_tag with no href: {a_tag.prettify()}")
+                        if not href:
                             continue
-
                         full_url = 'https://www.placera.se' + href
 
-                        # Extract info - Selectors might need adjustment
-                        company_span = a_tag.select_one('span.button__label.truncate') or \
-                                       a_tag.select_one('span.text-brand, span.font-bold') or \
-                                       a_tag.find('span', class_=re.compile(r'text-\[#')) # Matches example
-                        company = company_span.text.strip() if company_span else None
-
-                        title_tag = a_tag.select_one('h3.heading--small') or \
-                                    a_tag.find('h5') or \
-                                    a_tag.select_one('p.news_feed__paragraph') # h5 matches example
-                        title = title_tag.text.strip() if title_tag else ''
-
-                        # Date tag refinement
-                        date_tag = a_tag.select_one('time.feed__timestamp') # Original selector for <time>
-                        if not date_tag:
-                            # Try specific P tag for date based on example structure's classes
-                            # Example: <p class="font-sans text-sm text-text-main ...">
-                            date_tag = a_tag.select_one('p.text-sm.text-text-main')
-                        if not date_tag:
-                             # Fallback to the original broader search if the specific one fails
-                             date_tag = a_tag.find('p', string=re.compile(r'.+')) # General <p> tag
-                        
-                        raw_date = date_tag.text.strip() if date_tag else ''
-                        if date_tag and date_tag.name == 'time' and date_tag.has_attr('datetime'):
-                             raw_date = date_tag['datetime']
-
-                        source_p = a_tag.select_one('p.feed__meta') or \
-                                   (a_tag.find_all('p')[-1] if len(a_tag.find_all('p')) > (1 if date_tag and date_tag.name == 'p' else 0) else None) # Avoid picking date as source
-                        if source_p and date_tag and source_p == date_tag : # Ensure source_p is not the same as date_tag if date_tag was a <p>s
-                            all_p = a_tag.find_all('p')
-                            if len(all_p) > 1: # If there are multiple p tags, try to find one that is not the date
-                                for p_tag_candidate in reversed(all_p): # Check from last
-                                    if p_tag_candidate != date_tag:
-                                        source_p = p_tag_candidate
-                                        break
-                                else: # All p tags were the date tag? Unlikely.
-                                    source_p = None 
-                            else: # Only one p tag, and it was used for date
-                                source_p = None
-
-                        source, icon_url = get_source_icon(source_p.text.strip()) if source_p else (None, None)
-
-                        if verbose:
-                            print(f"[verbose] Scanning article: url={full_url}, title={title!r}, date={raw_date!r}, company={company!r}")
-
-                        key = full_url  # Use URL as the primary key
-                        if not key: # Fallback if URL somehow fails
-                            key = f'{tab}|{raw_date}|{title}'
-
-                        if not title or not raw_date:
-                            continue # Skip item if essential info missing
-
-                        if key in seen_articles:
+                        # Re-acquire elements
+                        company_span = a_tag.find('span', class_=lambda c: c and 'text-brand' in c.split())
+                        title_tag = a_tag.find('h5')
+                        date_p = a_tag.find('p', class_=lambda c: c and 'text-sm' in c.split())
+                        source_p = None
+                        for p in a_tag.find_all('p'):
+                            if p.get_text(strip=True).startswith('Källa:'):
+                                source_p = p
+                        # Defensive: ensure core elements exist (title/date/source); company span optional
+                        if not (title_tag and date_p and source_p):
+                            if verbose:
+                                print(f"[verbose] Unexpected missing core element for {full_url}")
                             continue
 
-                        # Track only specified companies
-                        company_match = company and any(tc.lower() in company.lower() for tc in companies_to_track)
-                        title_match = title and any(tc.lower() in title.lower() for tc in companies_to_track)
+                        title = title_tag.get_text(strip=True)
+                        raw_date = date_p.get_text(strip=True)
+                        source, icon_url = get_source_icon(source_p.get_text(strip=True))
 
-                        if company_match or title_match:
-                            # Call send_to_discord which contains the original log message
-                            await send_to_discord(title, raw_date, full_url, company, source, icon_url, bot, tab)
+                        # Helper: find first tracked company within given text (case-insensitive)
+                        def find_tracked_company(text: str):
+                            lower_text = text.lower()
+                            for tc in companies_to_track:
+                                if tc.lower() in lower_text:
+                                    return tc
+                            return None
 
-                        success_occurred = True # Mark success if we reach here
+                        matched_company = None
+                        span_company_text = company_span.get_text(strip=True) if company_span else None
+                        if span_company_text:
+                            matched_company = find_tracked_company(span_company_text)
+                        # If no company span match, attempt in title
+                        if not matched_company:
+                            matched_company = find_tracked_company(title)
+
+                        if verbose:
+                            print(f"[verbose] Article parsed: span_company={span_company_text!r} matched_company={matched_company!r} raw_date={raw_date!r} source={source!r} url={full_url}")
+
+                        key = full_url
+                        if key in seen_articles:
+                            continue
+                        if not title or not raw_date:
+                            continue
+
+                        # If we matched only in title (company span missing or not matching), we send with embed title set to 'Placera'
+                        if matched_company:
+                            embed_company_title = span_company_text if span_company_text and matched_company and matched_company.lower() in span_company_text.lower() else None
+                            await send_to_discord(title, raw_date, full_url, embed_company_title, source, icon_url, bot, tab)
+                            success_occurred = True
 
                         seen_articles.append(key)
-                        # Save less frequently to reduce I/O
                         if len(seen_articles) % 10 == 0:
-                             save_seen(seen_articles)
+                            save_seen(seen_articles)
 
                     # Add delay between tabs
                     await asyncio.sleep(INTER_TAB_DELAY)

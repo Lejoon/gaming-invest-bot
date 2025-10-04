@@ -63,11 +63,12 @@ async def ps(ctx, *, game_name: str = None):
     await gtsps_command(ctx, db, game_name)
     
 
-# Short seller command
-from fi_blankning import short_command    
+## Short seller command (deprecated)
+from typing import Optional
 @bot.command()
-async def short(ctx, *, company_name):
-    await short_command(ctx, db, company_name)
+async def short(ctx, *, company_name: Optional[str] = None):
+    # Deprecated command notice
+    await ctx.send("Use /short command. This is depreciated")
     
 # Earnings command
 from earnings import earnings_command
@@ -128,11 +129,12 @@ async def on_ready():
     else:
         print('Daily evening task is already running.')
 
-    if placera_task is None or placera_task.done():
-        print('Starting Placera telegram loop')
-        placera_task = bot.loop.create_task(placera_updates(bot))
-    else:
-        print('Placera telegram loop is already running.')
+    # Placera depreciated because of new loop in Scraper bot
+    #if placera_task is None or placera_task.done():
+    #    print('Starting Placera telegram loop')
+    #    placera_task = bot.loop.create_task(placera_updates(bot))
+    #else:
+    #    print('Placera telegram loop is already running.')
 
     if steam_task is None or steam_task.done():
         print('Starting Steam pipeline')

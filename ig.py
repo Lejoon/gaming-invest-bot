@@ -3,11 +3,12 @@ import pytz
 import asyncio
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from discord import Embed
 from general_utils import log_message, error_message
+import time
 
 CHANNEL_ID = 1161207966855348246
 CUSTOM_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
@@ -17,12 +18,68 @@ LABEL_EPICS = {"IX.D.OMX.IFD.IP": "OMX", "IX.D.DAX.IFD.IP": "DAX", "IX.D.SPTRD.I
 def get_seconds_until(time_hour, time_minute):
     now = datetime.now()
     target_time = datetime(now.year, now.month, now.day, time_hour, time_minute)
-    
     # If target time is in the past, calculate for the next day
     if now > target_time:
         target_time += timedelta(days=1)
-        
     return int((target_time - now).total_seconds())
+
+def _scrape_ig_once(options) -> list[dict]:
+    """Synchronous, blocking Selenium scrape. To be executed in a thread."""
+    with webdriver.Chrome(options=options) as driver:
+        driver.get('https://www.ig.com/se/index/marknader-index/')
+
+        # Wait for the web component and give a tiny buffer for rendering
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices")))
+        time.sleep(1)
+
+        web_component = driver.find_element(By.CSS_SELECTOR, 'igws-live-prices')
+        shadow_root = driver.execute_script('return arguments[0].shadowRoot', web_component)
+
+        WebDriverWait(driver, 5).until(
+            lambda d: len(shadow_root.find_elements(By.CSS_SELECTOR, '.dynamic-table__row.clickable')) > 0
+        )
+
+        rows = shadow_root.find_elements(By.CSS_SELECTOR, '.dynamic-table__row.clickable')
+        log_message(f"Found {len(rows)} rows in the table")
+
+        scraped_data: list[dict] = []
+        for i, row in enumerate(rows):
+            try:
+                index_element = row.find_element(By.CSS_SELECTOR, 'a[data-epic]')
+                index = index_element.get_attribute('data-epic')
+
+                if index in INTERESTED_EPICS:
+                    change_value = None
+                    selectors = [
+                        'span[data-field="CPC"]',
+                        'span[data-field="PC"]',
+                        '.price-change',
+                        '[data-field*="change"]',
+                        '[data-field*="Change"]'
+                    ]
+
+                    for selector in selectors:
+                        try:
+                            change_element = row.find_element(By.CSS_SELECTOR, selector)
+                            change_value = change_element.text.strip()
+                            if change_value and change_value != "":
+                                break
+                        except Exception:
+                            continue
+
+                    # Skip placeholder or missing values like "-"
+                    if change_value and change_value not in ("", "-"):
+                        scraped_data.append({'Index': index, 'Change Value': change_value})
+                        log_message(f"Successfully scraped {LABEL_EPICS.get(index, index)}: {change_value}")
+                    else:
+                        log_message(f"Could not find change value for {LABEL_EPICS.get(index, index)}")
+
+            except Exception as e:
+                log_message(f"Error processing row {i}: {str(e)}")
+                continue
+
+        return scraped_data
+
 
 async def get_scraped_data():
     options = webdriver.ChromeOptions()
@@ -34,75 +91,24 @@ async def get_scraped_data():
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            with webdriver.Chrome(options=options) as driver:
-                driver.get('https://www.ig.com/se/index/marknader-index/')
-                
-                # Reduced wait times
-                WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, "igws-live-prices")))
-                await asyncio.sleep(1)  # Reduced from 2 seconds - made async
-                
-                web_component = driver.find_element(By.CSS_SELECTOR, 'igws-live-prices')
-                shadow_root = driver.execute_script('return arguments[0].shadowRoot', web_component)
-                
-                # Reduced wait time for shadow DOM
-                WebDriverWait(driver, 5).until(
-                    lambda d: len(shadow_root.find_elements(By.CSS_SELECTOR, '.dynamic-table__row.clickable')) > 0
-                )
-                
-                rows = shadow_root.find_elements(By.CSS_SELECTOR, '.dynamic-table__row.clickable')
-                log_message(f"Found {len(rows)} rows in the table (attempt {attempt + 1})")
-                
-                scraped_data = []
-                for i, row in enumerate(rows):
-                    try:
-                        index_element = row.find_element(By.CSS_SELECTOR, 'a[data-epic]')
-                        index = index_element.get_attribute('data-epic')
-                        
-                        if index in INTERESTED_EPICS:
-                            change_value = None
-                            selectors = [
-                                'span[data-field="CPC"]',
-                                'span[data-field="PC"]',
-                                '.price-change',
-                                '[data-field*="change"]',
-                                '[data-field*="Change"]'
-                            ]
-                            
-                            for selector in selectors:
-                                try:
-                                    change_element = row.find_element(By.CSS_SELECTOR, selector)
-                                    change_value = change_element.text.strip()
-                                    if change_value and change_value != "":
-                                        break
-                                except:
-                                    continue
-                            
-                            if change_value and change_value != "":
-                                scraped_data.append({'Index': index, 'Change Value': change_value})
-                                log_message(f"Successfully scraped {LABEL_EPICS.get(index, index)}: {change_value}")
-                            else:
-                                error_message(f"Could not find change value for {LABEL_EPICS.get(index, index)}")
-                                
-                    except Exception as e:
-                        error_message(f"Error processing row {i}: {str(e)}")
-                        continue
-                
-                # Validate scraped data contains numeric values
-                valid_data = validate_scraped_data(scraped_data)
-                if valid_data:
-                    log_message(f"Successfully scraped {len(valid_data)} valid indexes")
-                    return valid_data
-                else:
-                    error_message(f"Attempt {attempt + 1}: No valid numeric data found, retrying...")
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                        
+            scraped_data = await asyncio.to_thread(_scrape_ig_once, options)
+            log_message(f"Attempt {attempt + 1}: scraped {len(scraped_data)} candidates")
+
+            valid_data = validate_scraped_data(scraped_data)
+            if valid_data:
+                log_message(f"Successfully scraped {len(valid_data)} valid indexes")
+                return valid_data
+            else:
+                await error_message(f"Attempt {attempt + 1}: No valid numeric data found, retrying...")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+
         except Exception as e:
-            error_message(f"Attempt {attempt + 1} failed: {str(e)}")
+            await error_message(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_retries - 1:
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
-    
-    error_message("All retry attempts failed")
+                await asyncio.sleep(2 ** attempt)
+
+    await error_message("All retry attempts failed")
     return []
 
 def validate_scraped_data(scraped_data):
@@ -117,8 +123,8 @@ def validate_scraped_data(scraped_data):
             valid_data.append(data)
             log_message(f"Validated numeric value for {LABEL_EPICS.get(data['Index'], data['Index'])}: {change_value}")
         except ValueError:
-            error_message(f"Invalid numeric value for {LABEL_EPICS.get(data['Index'], data['Index'])}: {change_value}")
-    
+            log_message(f"Invalid numeric value for {LABEL_EPICS.get(data['Index'], data['Index'])}: {change_value}")
+
     return valid_data
 
 async def send_daily_message(bot, time_hour, time_minute):
@@ -182,7 +188,7 @@ async def send_current_index(ctx):
         log_message(f'Sent current index to Discord with {valid_data_count} valid entries.')
         
     except Exception as e:
-        error_message(f"Error in send_current_index: {str(e)}")
+        await error_message(f"Error in send_current_index: {str(e)}")
         await ctx.send("❌ An error occurred while fetching index data.")
 
 async def daily_message_morning(bot):
